@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { sharedState } from '../utils/sharedState';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
 
 const SecureRoom = ({ isVisible, onClose, roomCode, isHost, currentUser }) => {
-  const { emit } = useSocket();
+  // const { emit } = useSocket(); // WebSocket disabled
+  const emit = () => {};
   const [securitySettings, setSecuritySettings] = useState({
     selfDestructFiles: false,
     screenshotDetection: false,

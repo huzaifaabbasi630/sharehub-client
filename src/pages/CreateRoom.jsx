@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
 import { useRoom } from '../context/RoomContext';
 import { generateRoomCode } from '../utils/generateRoomCode';
 import { createRoom } from '../services/api';
@@ -480,7 +480,10 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
 ════════════════════════════════════════ */
 function CreateRoom() {
   const navigate = useNavigate();
-  const { emit, on, off } = useSocket();
+  // const { emit, on, off } = useSocket(); // WebSocket disabled
+    const emit = () => {};
+    const on = () => {};
+    const off = () => {};
   const { setRoomData, setUserData, room, user } = useRoom();
 
   const [step, setStep] = useState('form');

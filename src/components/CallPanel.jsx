@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
 import { useRoom } from '../context/RoomContext';
 import {
   getLocalStream,
@@ -214,7 +214,10 @@ const S = () => (
 );
 
 function CallPanel({ roomCode, callType, onClose }) {
-  const { emit, on, off } = useSocket();
+  // const { emit, on, off } = useSocket(); // WebSocket disabled
+    const emit = () => {};
+    const on = () => {};
+    const off = () => {};
   const { user } = useRoom();
 
   const [localStream, setLocalStream] = useState(null);

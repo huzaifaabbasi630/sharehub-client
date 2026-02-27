@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
 import { useRoom } from '../context/RoomContext';
 import { isValidRoomCode } from '../utils/generateRoomCode';
 import { getRoom } from '../services/api';
@@ -184,7 +184,10 @@ function JoinRoom() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const { emit, on, off } = useSocket();
+  // const { emit, on, off } = useSocket(); // WebSocket disabled
+    const emit = () => {};
+    const on = () => {};
+    const off = () => {};
   const { setRoomData, setUserData } = useRoom();
 
   const [roomCode, setRoomCode] = useState(searchParams.get('code') || location.state?.prefillCode || '');

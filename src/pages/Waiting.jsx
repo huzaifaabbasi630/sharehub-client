@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
 import { useRoom } from '../context/RoomContext';
 import DraggableRefreshButton from '../components/DraggableRefreshButton';
 
@@ -129,7 +129,9 @@ const S = () => (
 function Waiting() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { on, off } = useSocket();
+  // const { on, off } = useSocket(); // WebSocket disabled
+    const on = () => {};
+    const off = () => {};
   const { setRoomData, setUserData, room } = useRoom();
 
   const { roomCode, userName, requestId } = location.state || {};

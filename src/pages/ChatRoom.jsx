@@ -189,7 +189,10 @@ const S = () => (
 function ChatRoom() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
-  const { emit, on, off } = useSocket();
+  // const { emit, on, off } = useSocket(); // WebSocket disabled
+  const emit = () => {};
+  const on = () => {};
+  const off = () => {};
   const {
     room,
     user,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
 
 const S = () => (
   <style>{`
@@ -274,7 +274,10 @@ const S = () => (
 
 function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest, onRejectRequest }) {
   const [joinRequests, setJoinRequests] = useState([]);
-  const { on, off, emit } = useSocket();
+  // const { on, off, emit } = useSocket(); // WebSocket disabled
+    const on = () => {};
+    const off = () => {};
+    const emit = () => {};
 
   // Listen for join requests - works for both CreateRoom and Sidebar
   useEffect(() => {
