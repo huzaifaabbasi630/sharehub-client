@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 // import { useSocket } from '../context/SocketContext'; // WebSocket disabled
+import { usePusher } from '../context/PusherContext'; // Using Pusher instead
 import { useRoom } from '../context/RoomContext';
 import { generateRoomCode } from '../utils/generateRoomCode';
 import { createRoom } from '../services/api';
@@ -480,45 +481,62 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
 ════════════════════════════════════════ */
 function CreateRoom() {
   const navigate = useNavigate();
-  // const { emit, on, off } = useSocket(); // WebSocket disabled
-    const emit = () => {};
-    const on = () => {};
-    const off = () => {};
   const { setRoomData, setUserData, room, user } = useRoom();
-
+  const { emit, bind, unbind, subscribe, isConnected } = usePusher();
+  
   const [step, setStep] = useState('form');
   const [roomName, setRoomName] = useState('');
   const [userName, setUserName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [joinRequests, setJoinRequests] = useState([]);
   const [copied, setCopied] = useState({ code: false, link: false });
+  
+  // Initialize Pusher when component mounts
+  useEffect(() => {
+    if (room?.code) {
+      subscribe(`room-${room.code}`);
+      
+      // Bind to join request events
+      bind('join_request_received', (data) => {
+        // Handle join request
+        console.log('Join request received:', data);
+        setJoinRequests(prev => {
+          if (prev.find(r => r.requestId === data.requestId)) return prev;
+          return [...prev, data];
+        });
+      });
+      
+      // Clean up on unmount
+      return () => {
+        unbind('join_request_received');
+      };
+    }
+  }, [room?.code, setJoinRequests]);
 
   const joinUrl = roomCode ? `${window.location.origin}/join?code=${roomCode}` : '';
 
   useEffect(() => {
-    on('room_created', (data) => {
+    bind('room_created', (data) => {
       console.log('Room created:', data);
     });
 
-    on('join_request_received', (data) => {
-      setJoinRequests(prev => [...prev, data]);
-    });
+    // We already handle join_request_received in the Pusher initialization effect
 
-    on('join_approved_notification', (data) => {
+    bind('join_approved_notification', (data) => {
       navigate(`/room/${roomCode}`);
     });
 
-    on('error', (error) => {
+    bind('error', (error) => {
       alert(error.message);
     });
 
     return () => {
-      off('room_created');
-      off('join_request_received');
-      off('join_approved_notification');
-      off('error');
+      unbind('room_created');
+      // Don't unbind join_request_received here as it's handled in the other effect
+      unbind('join_approved_notification');
+      unbind('error');
     };
-  }, [on, off, navigate, roomCode]);
+  }, [bind, unbind, navigate, roomCode]);
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();

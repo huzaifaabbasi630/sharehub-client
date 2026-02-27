@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 // import { useSocket } from '../context/SocketContext'; // WebSocket disabled
+import { usePusher } from '../context/PusherContext'; // Using Pusher instead
 
 const S = () => (
   <style>{`
@@ -274,10 +275,34 @@ const S = () => (
 
 function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest, onRejectRequest }) {
   const [joinRequests, setJoinRequests] = useState([]);
-  // const { on, off, emit } = useSocket(); // WebSocket disabled
-    const on = () => {};
-    const off = () => {};
-    const emit = () => {};
+  const { bind, unbind, subscribe, isConnected } = usePusher();
+  
+  // Subscribe to room events when component mounts
+  useEffect(() => {
+    if (isHost && roomCode) {
+      subscribe(`room-${roomCode}`);
+      
+      // Listen for join requests
+      bind('join_request_received', (data) => {
+        console.log('Sidebar received join request:', data);
+        // Normalize data format (server sends requesterName, we need userName)
+        const normalizedData = {
+          ...data,
+          userName: data.userName || data.requesterName || 'Unknown',
+          requesterName: data.requesterName || data.userName || 'Unknown'
+        };
+        setJoinRequests(prev => {
+          if (prev.find(r => r.requestId === normalizedData.requestId)) return prev;
+          return [...prev, normalizedData];
+        });
+      });
+      
+      // Clean up on unmount
+      return () => {
+        unbind('join_request_received');
+      };
+    }
+  }, [roomCode, isHost]);
 
   // Listen for join requests - works for both CreateRoom and Sidebar
   useEffect(() => {
