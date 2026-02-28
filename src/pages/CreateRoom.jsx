@@ -201,11 +201,11 @@ const PageWrap = ({ children }) => (
     }}>
       <div className="dot-grid" />
       {/* Glow orbs */}
-      <div style={{ position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none' }}>
-        <div style={{ position:'absolute', top:'-10%', left:'15%', width:'500px', height:'500px', borderRadius:'50%', background:'radial-gradient(circle,rgba(79,142,247,0.13) 0%,transparent 70%)', animation:'glow-pulse 5s ease-in-out infinite' }} />
-        <div style={{ position:'absolute', bottom:'-5%', right:'10%', width:'380px', height:'380px', borderRadius:'50%', background:'radial-gradient(circle,rgba(56,232,196,0.09) 0%,transparent 70%)', animation:'glow-pulse 5s ease-in-out infinite', animationDelay:'2.5s' }} />
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: '-10%', left: '15%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(79,142,247,0.13) 0%,transparent 70%)', animation: 'glow-pulse 5s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', bottom: '-5%', right: '10%', width: '380px', height: '380px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(56,232,196,0.09) 0%,transparent 70%)', animation: 'glow-pulse 5s ease-in-out infinite', animationDelay: '2.5s' }} />
       </div>
-      <div style={{ position:'relative', zIndex:10, width:'100%', maxWidth:'520px' }}>
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '520px' }}>
         {children}
       </div>
     </div>
@@ -214,9 +214,9 @@ const PageWrap = ({ children }) => (
 
 /* ── Card shell ── */
 const Card = ({ children }) => (
-  <div className="cr-card" style={{ position:'relative' }}>
+  <div className="cr-card" style={{ position: 'relative' }}>
     {/* Glow border */}
-    <div style={{ position:'absolute', inset:'-1px', borderRadius:'26px', background:'linear-gradient(135deg,rgba(79,142,247,0.28),rgba(56,232,196,0.08),rgba(79,142,247,0.04))', zIndex:-1 }} />
+    <div style={{ position: 'absolute', inset: '-1px', borderRadius: '26px', background: 'linear-gradient(135deg,rgba(79,142,247,0.28),rgba(56,232,196,0.08),rgba(79,142,247,0.04))', zIndex: -1 }} />
     <div style={{
       background: 'linear-gradient(160deg,rgba(13,18,40,0.97),rgba(8,11,28,0.98))',
       backdropFilter: 'blur(24px)',
@@ -233,15 +233,15 @@ const Card = ({ children }) => (
 /* ── Logo mark ── */
 const LogoMark = () => (
   <div style={{
-    width:'52px', height:'52px', borderRadius:'16px',
+    width: '52px', height: '52px', borderRadius: '16px',
     background: 'linear-gradient(135deg,#4f8ef7,#6a5af7)',
-    display:'flex', alignItems:'center', justifyContent:'center',
-    boxShadow:'0 0 28px rgba(79,142,247,0.4)',
-    animation:'float 4s ease-in-out infinite',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 0 28px rgba(79,142,247,0.4)',
+    animation: 'float 4s ease-in-out infinite',
     flexShrink: 0,
   }}>
     <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+      <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   </div>
 );
@@ -253,30 +253,30 @@ const FormStep = ({ roomName, setRoomName, userName, setUserName, onSubmit, onBa
   <PageWrap>
     <Card>
       {/* Back */}
-      <button onClick={onBack} className="cr-btn-ghost" style={{ marginBottom:'28px' }}>
+      <button onClick={onBack} className="cr-btn-ghost" style={{ marginBottom: '28px' }}>
         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 19l-7-7 7-7"/>
+          <path d="M15 19l-7-7 7-7" />
         </svg>
         Back
       </button>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', gap:'16px', marginBottom:'32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
         <LogoMark />
         <div>
-          <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:'22px', fontWeight:'800', color:'var(--text)', letterSpacing:'-0.6px' }}>
+          <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: '22px', fontWeight: '800', color: 'var(--text)', letterSpacing: '-0.6px' }}>
             Create a Room
           </h2>
-          <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'13.5px', color:'var(--muted)', marginTop:'3px' }}>
+          <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '13.5px', color: 'var(--muted)', marginTop: '3px' }}>
             Set up your collaboration space
           </p>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={onSubmit} style={{ display:'flex', flexDirection:'column', gap:'18px' }}>
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         <div>
-          <label style={{ display:'block', fontFamily:"'DM Sans',sans-serif", fontSize:'12.5px', fontWeight:'500', color:'rgba(238,242,255,0.5)', textTransform:'uppercase', letterSpacing:'1.2px', marginBottom:'8px' }}>
+          <label style={{ display: 'block', fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px', fontWeight: '500', color: 'rgba(238,242,255,0.5)', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: '8px' }}>
             Room Name
           </label>
           <input
@@ -290,7 +290,7 @@ const FormStep = ({ roomName, setRoomName, userName, setUserName, onSubmit, onBa
         </div>
 
         <div>
-          <label style={{ display:'block', fontFamily:"'DM Sans',sans-serif", fontSize:'12.5px', fontWeight:'500', color:'rgba(238,242,255,0.5)', textTransform:'uppercase', letterSpacing:'1.2px', marginBottom:'8px' }}>
+          <label style={{ display: 'block', fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px', fontWeight: '500', color: 'rgba(238,242,255,0.5)', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: '8px' }}>
             Your Name
           </label>
           <input
@@ -303,20 +303,20 @@ const FormStep = ({ roomName, setRoomName, userName, setUserName, onSubmit, onBa
           />
         </div>
 
-        <button type="submit" className="cr-btn-primary" style={{ marginTop:'6px' }}>
+        <button type="submit" className="cr-btn-primary" style={{ marginTop: '6px' }}>
           <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Create Room
         </button>
       </form>
 
       {/* Footer hint */}
-      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginTop:'24px', padding:'14px 16px', background:'rgba(79,142,247,0.06)', border:'1px solid rgba(79,142,247,0.15)', borderRadius:'12px' }}>
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '24px', padding: '14px 16px', background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: '12px' }}>
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
-        <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'12.5px', color:'rgba(148,163,184,0.6)', lineHeight:'1.5' }}>
+        <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px', color: 'rgba(148,163,184,0.6)', lineHeight: '1.5' }}>
           A unique room code and QR code will be generated for easy sharing.
         </p>
       </div>
@@ -329,11 +329,11 @@ const FormStep = ({ roomName, setRoomName, userName, setUserName, onSubmit, onBa
 ════════════════════════════════════════ */
 const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests, onApprove, onReject }) => (
   <PageWrap>
-    <div style={{ maxWidth:'560px', width:'100%', margin:'0 auto' }}>
+    <div style={{ maxWidth: '560px', width: '100%', margin: '0 auto' }}>
 
       {/* Success header */}
-      <div className="cr-card" style={{ position:'relative', marginBottom:'0' }}>
-        <div style={{ position:'absolute', inset:'-1px', borderRadius:'26px', background:'linear-gradient(135deg,rgba(56,232,196,0.2),rgba(79,142,247,0.1),rgba(56,232,196,0.03))', zIndex:-1 }} />
+      <div className="cr-card" style={{ position: 'relative', marginBottom: '0' }}>
+        <div style={{ position: 'absolute', inset: '-1px', borderRadius: '26px', background: 'linear-gradient(135deg,rgba(56,232,196,0.2),rgba(79,142,247,0.1),rgba(56,232,196,0.03))', zIndex: -1 }} />
         <div style={{
           background: 'linear-gradient(160deg,rgba(13,18,40,0.97),rgba(8,11,28,0.98))',
           backdropFilter: 'blur(24px)',
@@ -344,72 +344,72 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
         }}>
 
           {/* Success badge */}
-          <div style={{ textAlign:'center', marginBottom:'28px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <div style={{
-              width:'64px', height:'64px', borderRadius:'20px',
-              background:'linear-gradient(135deg,rgba(56,232,196,0.2),rgba(56,232,196,0.08))',
-              border:'1px solid rgba(56,232,196,0.3)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              margin:'0 auto 16px',
-              boxShadow:'0 0 32px rgba(56,232,196,0.15)',
+              width: '64px', height: '64px', borderRadius: '20px',
+              background: 'linear-gradient(135deg,rgba(56,232,196,0.2),rgba(56,232,196,0.08))',
+              border: '1px solid rgba(56,232,196,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: '0 0 32px rgba(56,232,196,0.15)',
             }}>
               <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#38e8c4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
+                <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:'22px', fontWeight:'800', color:'var(--text)', letterSpacing:'-0.6px', marginBottom:'6px' }}>
+            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: '22px', fontWeight: '800', color: 'var(--text)', letterSpacing: '-0.6px', marginBottom: '6px' }}>
               Room Created!
             </h2>
-            <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'14px', color:'var(--muted)' }}>
+            <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: 'var(--muted)' }}>
               Share the code or link below to invite others
             </p>
           </div>
 
           {/* Room name */}
-          <div className="info-block" style={{ marginBottom:'14px' }}>
+          <div className="info-block" style={{ marginBottom: '14px' }}>
             <label>Room Name</label>
-            <p style={{ fontFamily:"'Syne',sans-serif", fontSize:'17px', fontWeight:'700', color:'var(--text)' }}>{roomName}</p>
+            <p style={{ fontFamily: "'Syne',sans-serif", fontSize: '17px', fontWeight: '700', color: 'var(--text)' }}>{roomName}</p>
           </div>
 
           {/* Room code */}
-          <div className="info-block" style={{ marginBottom:'14px' }}>
+          <div className="info-block" style={{ marginBottom: '14px' }}>
             <label>Room Code</label>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <code style={{
-                fontFamily:"'Syne',sans-serif", fontSize:'28px', fontWeight:'800',
-                color:'var(--accent1)', letterSpacing:'6px',
+                fontFamily: "'Syne',sans-serif", fontSize: '28px', fontWeight: '800',
+                color: 'var(--accent1)', letterSpacing: '6px',
               }}>{roomCode}</code>
               <button
                 onClick={() => onCopy(roomCode, 'code')}
                 className={`cr-copy-btn${copied.code ? ' success' : ''}`}
               >
                 {copied.code
-                  ? <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied!</>
-                  : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy Code</>
+                  ? <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>Copied!</>
+                  : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>Copy Code</>
                 }
               </button>
             </div>
           </div>
 
           {/* Join link */}
-          <div className="info-block" style={{ marginBottom:'20px' }}>
+          <div className="info-block" style={{ marginBottom: '20px' }}>
             <label>Join Link</label>
-            <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
-                flex:1, padding:'10px 14px',
-                background:'rgba(255,255,255,0.03)',
-                border:'1px solid rgba(255,255,255,0.06)',
-                borderRadius:'10px',
-                fontFamily:"'DM Sans',sans-serif", fontSize:'12.5px',
-                color:'rgba(148,163,184,0.55)',
-                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                flex: 1, padding: '10px 14px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '10px',
+                fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px',
+                color: 'rgba(148,163,184,0.55)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>{joinUrl}</div>
               <button
                 onClick={() => onCopy(joinUrl, 'link')}
                 className={`cr-copy-btn${copied.link ? ' success' : ''}`}
               >
                 {copied.link
-                  ? <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied!</>
+                  ? <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>Copied!</>
                   : 'Copy Link'
                 }
               </button>
@@ -417,45 +417,45 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
           </div>
 
           {/* QR + waiting row */}
-          <div style={{ display:'flex', gap:'16px', alignItems:'flex-start' }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
             {/* QR */}
             <div style={{
-              background:'rgba(255,255,255,0.97)',
-              borderRadius:'16px',
-              padding:'14px',
-              display:'flex', flexDirection:'column', alignItems:'center', gap:'8px',
-              flexShrink:0,
+              background: 'rgba(255,255,255,0.97)',
+              borderRadius: '16px',
+              padding: '14px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+              flexShrink: 0,
             }}>
               <QRCodeSVG value={joinUrl} size={130} />
-              <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'11px', color:'#64748b', fontWeight:'500' }}>Scan to join</p>
+              <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Scan to join</p>
             </div>
 
             {/* Waiting state */}
             <div style={{
-              flex:1,
-              background:'rgba(255,255,255,0.02)',
-              border:'1px solid rgba(255,255,255,0.06)',
-              borderRadius:'16px',
-              padding:'20px',
-              display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-              gap:'14px', minHeight:'172px',
+              flex: 1,
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '16px',
+              padding: '20px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: '14px', minHeight: '172px',
             }}>
-              <div style={{ position:'relative', width:'36px', height:'36px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <div style={{ position:'absolute', inset:0, borderRadius:'50%', background:'rgba(79,142,247,0.15)', animation:'glow-pulse 2s ease-in-out infinite' }} />
+              <div style={{ position: 'relative', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(79,142,247,0.15)', animation: 'glow-pulse 2s ease-in-out infinite' }} />
                 <div className="spinner" />
               </div>
-              <div style={{ textAlign:'center' }}>
-                <p style={{ fontFamily:"'Syne',sans-serif", fontSize:'14px', fontWeight:'700', color:'var(--text)', marginBottom:'4px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontFamily: "'Syne',sans-serif", fontSize: '14px', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                   Waiting…
                 </p>
-                <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'12.5px', color:'var(--muted)', lineHeight:'1.5' }}>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px', color: 'var(--muted)', lineHeight: '1.5' }}>
                   Share the code or QR — people can join once approved
                 </p>
               </div>
               {/* Online indicator */}
-              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div className="ping-dot" />
-                <span style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'12px', color:'rgba(56,232,196,0.7)' }}>You're live</span>
+                <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: 'rgba(56,232,196,0.7)' }}>You're live</span>
               </div>
             </div>
           </div>
@@ -483,19 +483,19 @@ function CreateRoom() {
   const navigate = useNavigate();
   const { setRoomData, setUserData, room, user } = useRoom();
   const { emit, bind, unbind, subscribe, isConnected } = usePusher();
-  
+
   const [step, setStep] = useState('form');
   const [roomName, setRoomName] = useState('');
   const [userName, setUserName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [joinRequests, setJoinRequests] = useState([]);
   const [copied, setCopied] = useState({ code: false, link: false });
-  
+
   // Initialize Pusher when component mounts
   useEffect(() => {
     if (room?.code) {
       subscribe(`room-${room.code}`);
-      
+
       // Bind to join request events
       bind('join_request_received', (data) => {
         // Handle join request
@@ -505,7 +505,7 @@ function CreateRoom() {
           return [...prev, data];
         });
       });
-      
+
       // Clean up on unmount
       return () => {
         unbind('join_request_received');
@@ -557,14 +557,14 @@ function CreateRoom() {
         setRoomData(response.room);
         setUserData({ name: userName, isHost: true });
         emit('create_room', { roomCode: code, userName });
-        
+
         // Save to created rooms history
         const createdRooms = JSON.parse(localStorage.getItem('sharehub_created_rooms') || '[]');
         if (!createdRooms.includes(code)) {
           createdRooms.push(code);
           localStorage.setItem('sharehub_created_rooms', JSON.stringify(createdRooms));
         }
-        
+
         // Save to room history
         const history = JSON.parse(localStorage.getItem('sharehub_room_history') || '[]');
         const roomEntry = {
@@ -580,18 +580,18 @@ function CreateRoom() {
           history.unshift(roomEntry);
         }
         localStorage.setItem('sharehub_room_history', JSON.stringify(history.slice(0, 20)));
-        
+
         // Save current room data for restoration from history
         localStorage.setItem('sharehub_current_room', JSON.stringify(roomEntry));
         localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: true }));
-        
+
         // Clear any existing data for this room code to start fresh
         localStorage.removeItem(`sharehub_messages_${code}`);
         localStorage.removeItem(`sharehub_files_${code}`);
         localStorage.removeItem(`sharehub_secure_${code}`);
         localStorage.removeItem(`sharehub_screenshots_${code}`);
         localStorage.removeItem(`sharehub_join_requests_${code}`);
-        
+
         setStep('created');
       }
     } catch (error) {
@@ -604,12 +604,12 @@ function CreateRoom() {
     console.log('Approving join:', { requestId, requesterId, roomCode, requesterName });
     emit('approve_join', { requestId, requesterId, roomCode, requesterName });
     setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
-    
+
     // Save room data before navigating
     const roomData = { code: roomCode, name: roomName, _id: roomCode };
     localStorage.setItem('sharehub_current_room', JSON.stringify(roomData));
     localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: true }));
-    
+
     navigate(`/room/${roomCode}`);
   };
 
