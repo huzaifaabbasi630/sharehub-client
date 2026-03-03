@@ -126,13 +126,13 @@ const S = () => (
   `}</style>
 );
 
+import { usePusher } from '../context/PusherContext';
+
 function Waiting() {
   const navigate = useNavigate();
   const location = useLocation();
-  // const { on, off } = useSocket(); // WebSocket disabled
-    const on = () => {};
-    const off = () => {};
-  const { setRoomData, setUserData, room } = useRoom();
+  const { bind, unbind, subscribe } = usePusher();
+  const { setRoomData, setUserData } = useRoom();
 
   const { roomCode, userName, requestId } = location.state || {};
 
@@ -142,28 +142,38 @@ function Waiting() {
       return;
     }
 
-    on('join_approved', (data) => {
-      console.log('Join approved received:', data);
+    // Subscribe to room channel
+    subscribe(`room-${roomCode}`);
+
+    const handleAccept = (data) => {
+      console.log('Join approved received via Pusher:', data);
       setRoomData({
-        _id: data.roomId,
+        _id: data.roomCode, // Fallback if no specific ID
         code: data.roomCode,
-        name: data.roomName,
+        name: data.roomCode, // Or get from actual room data
       });
       setUserData({ name: userName, isHost: false });
-      console.log('Navigating to room:', data.roomCode);
-      navigate(`/room/${data.roomCode}`);
-    });
 
-    on('join_rejected', (data) => {
-      alert(data.message);
+      // Store in localStorage for persistence
+      localStorage.setItem('sharehub_current_room', JSON.stringify({ code: data.roomCode }));
+      localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: false }));
+
+      navigate(`/room/${data.roomCode}`);
+    };
+
+    const handleReject = (data) => {
+      alert(data.message || 'Join request rejected');
       navigate('/join');
-    });
+    };
+
+    bind('request-accepted', handleAccept);
+    bind('request-rejected', handleReject);
 
     return () => {
-      off('join_approved');
-      off('join_rejected');
+      unbind('request-accepted');
+      unbind('request-rejected');
     };
-  }, [on, off, navigate, roomCode, userName, setRoomData, setUserData]);
+  }, [roomCode, userName, bind, unbind, subscribe, navigate, setRoomData, setUserData]);
 
   return (
     <>
@@ -178,16 +188,16 @@ function Waiting() {
         <div className="dot-grid" />
 
         {/* Glow orbs */}
-        <div style={{ position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none' }}>
-          <div style={{ position:'absolute', top:'-10%', left:'15%', width:'500px', height:'500px', borderRadius:'50%', background:'radial-gradient(circle,rgba(79,142,247,0.12) 0%,transparent 70%)', animation:'glow-pulse 5s ease-in-out infinite' }} />
-          <div style={{ position:'absolute', bottom:'-5%', right:'10%', width:'380px', height:'380px', borderRadius:'50%', background:'radial-gradient(circle,rgba(56,232,196,0.08) 0%,transparent 70%)', animation:'glow-pulse 5s ease-in-out infinite', animationDelay:'2.5s' }} />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', top: '-10%', left: '15%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(79,142,247,0.12) 0%,transparent 70%)', animation: 'glow-pulse 5s ease-in-out infinite' }} />
+          <div style={{ position: 'absolute', bottom: '-5%', right: '10%', width: '380px', height: '380px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(56,232,196,0.08) 0%,transparent 70%)', animation: 'glow-pulse 5s ease-in-out infinite', animationDelay: '2.5s' }} />
         </div>
 
         {/* Card */}
-        <div className="w-card" style={{ width:'100%', maxWidth:'420px', position:'relative', zIndex:10 }}>
+        <div className="w-card" style={{ width: '100%', maxWidth: '420px', position: 'relative', zIndex: 10 }}>
 
           {/* Glow border */}
-          <div style={{ position:'absolute', inset:'-1px', borderRadius:'26px', background:'linear-gradient(135deg,rgba(79,142,247,0.25),rgba(56,232,196,0.1),rgba(79,142,247,0.03))', zIndex:-1 }} />
+          <div style={{ position: 'absolute', inset: '-1px', borderRadius: '26px', background: 'linear-gradient(135deg,rgba(79,142,247,0.25),rgba(56,232,196,0.1),rgba(79,142,247,0.03))', zIndex: -1 }} />
 
           <div style={{
             background: 'linear-gradient(160deg,rgba(13,18,40,0.97),rgba(8,11,28,0.98))',
@@ -200,81 +210,81 @@ function Waiting() {
           }}>
 
             {/* Animated clock icon with orbiting rings */}
-            <div style={{ position:'relative', width:'100px', height:'100px', margin:'0 auto 28px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ position: 'relative', width: '100px', height: '100px', margin: '0 auto 28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 
               {/* Outer orbit ring */}
-              <div className="orbit-ring" style={{ inset:'-4px' }} />
+              <div className="orbit-ring" style={{ inset: '-4px' }} />
               {/* Inner orbit ring */}
-              <div className="orbit-ring-2" style={{ inset:'8px' }} />
+              <div className="orbit-ring-2" style={{ inset: '8px' }} />
 
               {/* Center circle */}
               <div style={{
-                width:'72px', height:'72px', borderRadius:'50%',
-                background:'linear-gradient(135deg,rgba(79,142,247,0.15),rgba(79,142,247,0.06))',
-                border:'1px solid rgba(79,142,247,0.25)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                boxShadow:'0 0 32px rgba(79,142,247,0.2)',
-                animation:'float 3s ease-in-out infinite',
+                width: '72px', height: '72px', borderRadius: '50%',
+                background: 'linear-gradient(135deg,rgba(79,142,247,0.15),rgba(79,142,247,0.06))',
+                border: '1px solid rgba(79,142,247,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 0 32px rgba(79,142,247,0.2)',
+                animation: 'float 3s ease-in-out infinite',
               }}>
-                <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ animation:'glow-pulse 2s ease-in-out infinite' }}>
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
+                <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'glow-pulse 2s ease-in-out infinite' }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
                 </svg>
               </div>
             </div>
 
             {/* Title */}
             <h2 style={{
-              fontFamily:"'Syne',sans-serif",
-              fontSize:'22px', fontWeight:'800',
-              color:'var(--text)', letterSpacing:'-0.6px',
-              marginBottom:'10px',
+              fontFamily: "'Syne',sans-serif",
+              fontSize: '22px', fontWeight: '800',
+              color: 'var(--text)', letterSpacing: '-0.6px',
+              marginBottom: '10px',
             }}>
               Waiting for Approval
             </h2>
 
             <p style={{
-              fontFamily:"'DM Sans',sans-serif",
-              fontSize:'14.5px', color:'rgba(148,163,184,0.65)',
-              lineHeight:'1.65', marginBottom:'28px',
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: '14.5px', color: 'rgba(148,163,184,0.65)',
+              lineHeight: '1.65', marginBottom: '28px',
             }}>
               Your request to join room{' '}
               <span className="code-shimmer" style={{
-                fontFamily:"'Syne',sans-serif",
-                fontWeight:'800', fontSize:'15px',
-                color:'var(--accent1)', letterSpacing:'2px',
-                padding:'2px 8px',
-                background:'rgba(79,142,247,0.1)',
-                borderRadius:'7px',
-                border:'1px solid rgba(79,142,247,0.2)',
+                fontFamily: "'Syne',sans-serif",
+                fontWeight: '800', fontSize: '15px',
+                color: 'var(--accent1)', letterSpacing: '2px',
+                padding: '2px 8px',
+                background: 'rgba(79,142,247,0.1)',
+                borderRadius: '7px',
+                border: '1px solid rgba(79,142,247,0.2)',
               }}>{roomCode}</span>
               {' '}has been sent to the host.
             </p>
 
             {/* User info chip */}
             <div style={{
-              display:'flex', alignItems:'center', gap:'12px',
-              background:'rgba(255,255,255,0.03)',
-              border:'1px solid rgba(255,255,255,0.07)',
-              borderRadius:'16px', padding:'14px 18px',
-              marginBottom:'28px', textAlign:'left',
+              display: 'flex', alignItems: 'center', gap: '12px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: '16px', padding: '14px 18px',
+              marginBottom: '28px', textAlign: 'left',
             }}>
               <div style={{
-                width:'42px', height:'42px', borderRadius:'50%',
-                background:'linear-gradient(135deg,#4f8ef7,#6a5af7)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontFamily:"'Syne',sans-serif", color:'#fff',
-                fontSize:'16px', fontWeight:'800', flexShrink:0,
+                width: '42px', height: '42px', borderRadius: '50%',
+                background: 'linear-gradient(135deg,#4f8ef7,#6a5af7)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: "'Syne',sans-serif", color: '#fff',
+                fontSize: '16px', fontWeight: '800', flexShrink: 0,
               }}>
                 {userName?.charAt(0).toUpperCase()}
               </div>
-              <div style={{ flex:1 }}>
-                <p style={{ fontFamily:"'Syne',sans-serif", fontSize:'15px', fontWeight:'700', color:'var(--text)', marginBottom:'3px' }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontFamily: "'Syne',sans-serif", fontSize: '15px', fontWeight: '700', color: 'var(--text)', marginBottom: '3px' }}>
                   {userName}
                 </p>
-                <div style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                   <div className="status-dot" />
-                  <span style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'12.5px', color:'rgba(56,232,196,0.65)' }}>
+                  <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px', color: 'rgba(56,232,196,0.65)' }}>
                     Request pending…
                   </span>
                 </div>
@@ -282,25 +292,25 @@ function Waiting() {
             </div>
 
             {/* Spinner */}
-            <div style={{ display:'flex', justifyContent:'center', marginBottom:'20px' }}>
-              <div style={{ position:'relative', width:'44px', height:'44px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+              <div style={{ position: 'relative', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {/* Outer glow ring */}
-                <div style={{ position:'absolute', inset:0, borderRadius:'50%', background:'rgba(79,142,247,0.1)', animation:'glow-pulse 2s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(79,142,247,0.1)', animation: 'glow-pulse 2s ease-in-out infinite' }} />
                 {/* Spinner */}
                 <div style={{
-                  width:'36px', height:'36px',
-                  border:'2.5px solid rgba(79,142,247,0.15)',
-                  borderTopColor:'#4f8ef7',
-                  borderRadius:'50%',
-                  animation:'spin 0.9s linear infinite',
+                  width: '36px', height: '36px',
+                  border: '2.5px solid rgba(79,142,247,0.15)',
+                  borderTopColor: '#4f8ef7',
+                  borderRadius: '50%',
+                  animation: 'spin 0.9s linear infinite',
                 }} />
               </div>
             </div>
 
             <p style={{
-              fontFamily:"'DM Sans',sans-serif",
-              fontSize:'13px', color:'rgba(148,163,184,0.4)',
-              marginBottom:'24px',
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: '13px', color: 'rgba(148,163,184,0.4)',
+              marginBottom: '24px',
             }}>
               Please wait while the host reviews your request
             </p>
@@ -312,7 +322,7 @@ function Waiting() {
           </div>
         </div>
       </div>
-      
+
       <DraggableRefreshButton onRefresh={() => window.location.reload()} />
     </>
   );

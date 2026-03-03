@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
-import { usePusher } from '../context/PusherContext'; // Using Pusher instead
+import { usePusher } from '../context/PusherContext';
 import { useRoom } from '../context/RoomContext';
 import { generateRoomCode } from '../utils/generateRoomCode';
-import { createRoom } from '../services/api';
+import { createRoom, acceptJoinRequest, rejectJoinRequest } from '../services/api';
 import JoinRequestModal from '../components/JoinRequestModal';
 import DraggableRefreshButton from '../components/DraggableRefreshButton';
 
@@ -479,6 +478,7 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
 /* ════════════════════════════════════════
    MAIN COMPONENT — JS logic unchanged
 ════════════════════════════════════════ */
+
 function CreateRoom() {
   const navigate = useNavigate();
   const { setRoomData, setUserData, room, user } = useRoom();
@@ -496,47 +496,45 @@ function CreateRoom() {
     if (room?.code) {
       subscribe(`room-${room.code}`);
 
-      // Bind to join request events
-      bind('join_request_received', (data) => {
-        // Handle join request
-        console.log('Join request received:', data);
+      const handleJoinReq = (data) => {
+        console.log('Join request received via Pusher:', data);
+        const normalizedData = {
+          ...data,
+          requestId: data.user?.id || data.requestId || `req-${Date.now()}`,
+          userName: data.user?.name || data.userName || data.requesterName || 'Unknown',
+        };
         setJoinRequests(prev => {
-          if (prev.find(r => r.requestId === data.requestId)) return prev;
-          return [...prev, data];
+          if (prev.find(r => r.requestId === normalizedData.requestId)) return prev;
+          return [...prev, normalizedData];
         });
-      });
+      };
+
+      // Bind to join-request (from server)
+      bind('join-request', handleJoinReq);
+
+      // Also bind to old event name just in case
+      bind('join_request_received', handleJoinReq);
 
       // Clean up on unmount
       return () => {
+        unbind('join-request');
         unbind('join_request_received');
       };
     }
-  }, [room?.code, setJoinRequests]);
+  }, [room?.code, bind, unbind, subscribe]);
 
   const joinUrl = roomCode ? `${window.location.origin}/join?code=${roomCode}` : '';
 
   useEffect(() => {
-    bind('room_created', (data) => {
-      console.log('Room created:', data);
-    });
-
-    // We already handle join_request_received in the Pusher initialization effect
-
-    bind('join_approved_notification', (data) => {
-      navigate(`/room/${roomCode}`);
-    });
-
-    bind('error', (error) => {
-      alert(error.message);
+    // Listen for acceptance confirmation if needed
+    bind('request-accepted', (data) => {
+      console.log('Request accepted confirmed:', data);
     });
 
     return () => {
-      unbind('room_created');
-      // Don't unbind join_request_received here as it's handled in the other effect
-      unbind('join_approved_notification');
-      unbind('error');
+      unbind('request-accepted');
     };
-  }, [bind, unbind, navigate, roomCode]);
+  }, [bind, unbind]);
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
@@ -600,22 +598,30 @@ function CreateRoom() {
     }
   };
 
-  const handleApproveJoin = (requestId, requesterId, requesterName) => {
+  const handleApproveJoin = async (requestId, requesterId, requesterName) => {
     console.log('Approving join:', { requestId, requesterId, roomCode, requesterName });
-    emit('approve_join', { requestId, requesterId, roomCode, requesterName });
-    setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
+    try {
+      await acceptJoinRequest(roomCode, `/room/${roomCode}`, userName);
+      setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
 
-    // Save room data before navigating
-    const roomData = { code: roomCode, name: roomName, _id: roomCode };
-    localStorage.setItem('sharehub_current_room', JSON.stringify(roomData));
-    localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: true }));
+      // Save room data before navigating
+      const roomData = { code: roomCode, name: roomName, _id: roomCode };
+      localStorage.setItem('sharehub_current_room', JSON.stringify(roomData));
+      localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: true }));
 
-    navigate(`/room/${roomCode}`);
+      navigate(`/room/${roomCode}`);
+    } catch (err) {
+      console.error('Approval failed:', err);
+    }
   };
 
-  const handleRejectJoin = (requestId, requesterId) => {
-    emit('reject_join', { requestId, requesterId });
-    setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
+  const handleRejectJoin = async (requestId, requesterId) => {
+    try {
+      await rejectJoinRequest(roomCode, requestId);
+      setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
+    } catch (err) {
+      console.error('Rejection failed:', err);
+    }
   };
 
   const copyToClipboard = (text, type) => {

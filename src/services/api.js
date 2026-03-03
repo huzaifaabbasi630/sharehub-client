@@ -1,28 +1,51 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://sharehub-backend.vercel.app/api';
+/**
+ * Production config:
+ * - VITE_BACKEND_URL = https://your-backend-project.vercel.app
+ *
+ * NOTE: Do NOT include "/api" in VITE_BACKEND_URL.
+ */
+const API_BASE_URL =
+  import.meta.env.VITE_BACKEND_URL || 'https://sharehub-backend.vercel.app';
 
 export const createRoom = async (roomData) => {
-  const response = await axios.post(`${API_BASE_URL}/rooms/create`, roomData);
+  const response = await axios.post(`${API_BASE_URL}/api/rooms/create`, roomData);
   return response.data;
 };
 
 export const getRoom = async (code) => {
-  const response = await axios.get(`${API_BASE_URL}/rooms/${code}`);
+  const response = await axios.get(`${API_BASE_URL}/api/rooms/${code}`);
   return response.data;
 };
 
 export const getMessages = async (roomId) => {
-  const response = await axios.get(`${API_BASE_URL}/rooms/${roomId}/messages`);
+  const response = await axios.get(`${API_BASE_URL}/api/rooms/${roomId}/messages`);
   return response.data;
 };
 
 export const sendMessage = async (messageData) => {
-  const response = await axios.post(`${API_BASE_URL}/messages`, messageData);
+  const response = await axios.post(`${API_BASE_URL}/api/messages`, messageData);
   return response.data;
 };
 
 export const markMessageAsRead = async (messageId, userId) => {
-  const response = await axios.put(`${API_BASE_URL}/messages/${messageId}/read`, { userId });
+  const response = await axios.put(`${API_BASE_URL}/api/messages/${messageId}/read`, { userId });
+  return response.data;
+};
+
+// Join Request Pusher Triggers
+export const sendJoinRequest = async (roomCode, user) => {
+  const response = await axios.post(`${API_BASE_URL}/api/join-request`, { roomCode, user });
+  return response.data;
+};
+
+export const acceptJoinRequest = async (roomCode, meetingPath, acceptedBy) => {
+  const response = await axios.post(`${API_BASE_URL}/api/accept-request`, { roomCode, meetingPath, acceptedBy });
+  return response.data;
+};
+
+export const rejectJoinRequest = async (roomCode, requesterId) => {
+  const response = await axios.post(`${API_BASE_URL}/api/reject-request`, { roomCode, requesterId });
   return response.data;
 };

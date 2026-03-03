@@ -208,7 +208,7 @@ void main() {
           smoothMouseRef.current.y += (mouseRef.current.y - smoothMouseRef.current.y) * 0.05;
           uniforms.mousePos.value = [smoothMouseRef.current.x, smoothMouseRef.current.y];
         }
-        renderer.render({ mesh });
+        renderer.render({ scene: mesh });
         animationIdRef.current = requestAnimationFrame(animate);
       };
 

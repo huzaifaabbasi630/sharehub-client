@@ -273,94 +273,62 @@ const S = () => (
   `}</style>
 );
 
+import { acceptJoinRequest, rejectJoinRequest } from '../services/api';
+
 function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest, onRejectRequest }) {
   const [joinRequests, setJoinRequests] = useState([]);
-  const { bind, unbind, subscribe, isConnected } = usePusher();
-  
+  const { bind, unbind, subscribe, emit } = usePusher();
+
   // Subscribe to room events when component mounts
   useEffect(() => {
     if (isHost && roomCode) {
       subscribe(`room-${roomCode}`);
-      
-      // Listen for join requests
-      bind('join_request_received', (data) => {
-        console.log('Sidebar received join request:', data);
-        // Normalize data format (server sends requesterName, we need userName)
+
+      const handleJoinReq = (data) => {
+        console.log('Sidebar received join request via Pusher:', data);
         const normalizedData = {
           ...data,
-          userName: data.userName || data.requesterName || 'Unknown',
-          requesterName: data.requesterName || data.userName || 'Unknown'
+          requestId: data.user?.id || data.requestId || `req-${Date.now()}`,
+          userName: data.user?.name || data.userName || data.requesterName || 'Unknown',
         };
         setJoinRequests(prev => {
           if (prev.find(r => r.requestId === normalizedData.requestId)) return prev;
           return [...prev, normalizedData];
         });
-      });
-      
-      // Clean up on unmount
+      };
+
+      // Bind to join-request (from server)
+      bind('join-request', handleJoinReq);
+
+      // Also bind to old event name just in case
+      bind('join_request_received', handleJoinReq);
+
       return () => {
+        unbind('join-request');
         unbind('join_request_received');
       };
     }
-  }, [roomCode, isHost]);
+  }, [roomCode, isHost, bind, unbind, subscribe]);
 
-  // Listen for join requests - works for both CreateRoom and Sidebar
-  useEffect(() => {
-    if (isHost && roomCode) {
-      console.log('Sidebar: Setting up join request listener for room:', roomCode);
-      console.log('Sidebar: isHost=', isHost, 'roomCode=', roomCode);
-      
-      const handleJoinRequest = (data) => {
-        console.log('Sidebar received join request:', data);
-        // Normalize data format (server sends requesterName, we need userName)
-        const normalizedData = {
-          ...data,
-          userName: data.userName || data.requesterName || 'Unknown',
-          requesterName: data.requesterName || data.userName || 'Unknown'
-        };
-        setJoinRequests(prev => {
-          if (prev.find(r => r.requestId === normalizedData.requestId)) return prev;
-          return [...prev, normalizedData];
-        });
-      };
-      
-      // Also listen for requests sent via one-time links
-      const handleOneTimeRequest = (data) => {
-        console.log('Sidebar received one-time link request:', data);
-        handleJoinRequest(data);
-      };
-      
-      on('join_request_received', handleJoinRequest);
-      on('one_time_join_request', handleOneTimeRequest);
-      
-      return () => { 
-        console.log('Sidebar: Cleaning up join request listener');
-        off('join_request_received', handleJoinRequest); 
-        off('one_time_join_request', handleOneTimeRequest);
-      };
-    } else {
-      console.log('Sidebar: NOT setting up listener - isHost=', isHost, 'roomCode=', roomCode);
+  const handleApprove = async (request) => {
+    try {
+      await acceptJoinRequest(roomCode, `/room/${roomCode}`, currentUser.name);
+      setJoinRequests(prev => prev.filter(r => r.requestId !== request.requestId));
+      if (onApproveRequest) onApproveRequest(request);
+    } catch (err) {
+      console.error('Approval failed:', err);
+      alert('Failed to approve request');
     }
-  }, [isHost, roomCode, on, off]);
-
-  const handleApprove = (request) => {
-    emit('approve_join', {
-      requestId: request.requestId,
-      requesterId: request.requesterId,
-      roomCode,
-      requesterName: request.requesterName || request.userName,
-    });
-    setJoinRequests(prev => prev.filter(r => r.requestId !== request.requestId));
-    if (onApproveRequest) onApproveRequest(request);
   };
 
-  const handleReject = (request) => {
-    emit('reject_join', {
-      requestId: request.requestId,
-      requesterId: request.requesterId,
-    });
-    setJoinRequests(prev => prev.filter(r => r.requestId !== request.requestId));
-    if (onRejectRequest) onRejectRequest(request);
+  const handleReject = async (request) => {
+    try {
+      await rejectJoinRequest(roomCode, request.requestId);
+      setJoinRequests(prev => prev.filter(r => r.requestId !== request.requestId));
+      if (onRejectRequest) onRejectRequest(request);
+    } catch (err) {
+      console.error('Rejection failed:', err);
+    }
   };
 
   const totalCount = participants.length + 1;
@@ -400,7 +368,7 @@ function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest
             {isHost && (
               <div className="sb-crown">
                 <svg width="14" height="14" fill="#f59e0b" viewBox="0 0 24 24">
-                  <path d="M2 19l2-8 5 5 3-9 3 9 5-5 2 8H2z"/>
+                  <path d="M2 19l2-8 5 5 3-9 3 9 5-5 2 8H2z" />
                 </svg>
               </div>
             )}
@@ -431,7 +399,7 @@ function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest
               {p.isHost && (
                 <div className="sb-crown">
                   <svg width="14" height="14" fill="#f59e0b" viewBox="0 0 24 24">
-                    <path d="M2 19l2-8 5 5 3-9 3 9 5-5 2 8H2z"/>
+                    <path d="M2 19l2-8 5 5 3-9 3 9 5-5 2 8H2z" />
                   </svg>
                 </div>
               )}
@@ -448,11 +416,11 @@ function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest
               </div>
               {joinRequests.map(request => (
                 <div key={request.requestId} className="sb-request-card">
-                  <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0' }}>
                     <div className="sb-req-avatar">
                       {request.userName?.charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <p className="sb-req-name">{request.userName}</p>
                       <p className="sb-req-sub">Wants to join</p>
                     </div>
@@ -460,13 +428,13 @@ function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest
                   <div className="sb-req-btns">
                     <button className="sb-req-accept" onClick={() => handleApprove(request)}>
                       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
+                        <polyline points="20 6 9 17 4 12" />
                       </svg>
                       Accept
                     </button>
                     <button className="sb-req-reject" onClick={() => handleReject(request)}>
                       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                       </svg>
                       Reject
                     </button>
@@ -481,7 +449,7 @@ function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest
         <div className="sb-footer">
           <div className="sb-footer-logo">
             <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
           <span className="sb-footer-text">ShareHub</span>
