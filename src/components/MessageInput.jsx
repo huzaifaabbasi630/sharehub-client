@@ -204,8 +204,22 @@ const S = () => (
   `}</style>
 );
 
-function MessageInput({ onSendMessage, onTyping }) {
+function MessageInput({ onSendMessage, onTyping, isImproving, onImprove, improvedText }) {
     const [message, setMessage] = useState('');
+
+    useEffect(() => {
+        if (improvedText) {
+            setMessage(improvedText);
+            if (inputRef.current) {
+                // Auto-resize
+                setTimeout(() => {
+                    inputRef.current.style.height = 'auto';
+                    inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
+                }, 0);
+            }
+        }
+    }, [improvedText]);
+
     const [selectedFile, setSelectedFile] = useState(null);
     const [isTyping, setIsTyping] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -396,9 +410,9 @@ function MessageInput({ onSendMessage, onTyping }) {
                 {audioBlob && !isRecording && (
                     <div className="mi-file-chip">
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                            <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
                         </svg>
                         <span className="mi-file-name">Voice message ({formatTime(recordingTime)})</span>
                         <button className="mi-file-remove" onClick={() => { setAudioBlob(null); setRecordingTime(0); }}>
@@ -448,36 +462,47 @@ function MessageInput({ onSendMessage, onTyping }) {
                                 rows={1}
                                 disabled={!!audioBlob}
                             />
+                            {!audioBlob && message.trim().length > 5 && (
+                                <button
+                                    type="button"
+                                    onClick={() => onImprove(message)}
+                                    disabled={isImproving}
+                                    className="p-1 px-2 rounded-lg bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all text-[10px] font-black uppercase flex items-center gap-1"
+                                    title="AI Improve"
+                                >
+                                    {isImproving ? '...' : '🤖 Improve'}
+                                </button>
+                            )}
                         </div>
                     )}
 
                     {/* Voice / Send buttons */}
                     {!isRecording && !audioBlob && message.trim() === '' && !selectedFile ? (
                         /* Voice record button */
-                        <button 
-                            type="button" 
-                            className="mi-icon-btn" 
+                        <button
+                            type="button"
+                            className="mi-icon-btn"
                             onClick={startRecording}
                             title="Record voice message"
                             style={{ color: '#ef4444' }}
                         >
                             <svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                                <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                                <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                                <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                                <line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
                             </svg>
                         </button>
                     ) : isRecording ? (
                         /* Stop recording button */
-                        <button 
-                            type="button" 
-                            className="mi-send-btn" 
+                        <button
+                            type="button"
+                            className="mi-send-btn"
                             onClick={stopRecording}
                             title="Stop recording"
                             style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
                         >
                             <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
-                                <rect x="6" y="6" width="12" height="12" rx="2"/>
+                                <rect x="6" y="6" width="12" height="12" rx="2" />
                             </svg>
                         </button>
                     ) : (
@@ -492,9 +517,9 @@ function MessageInput({ onSendMessage, onTyping }) {
 
                     {/* Cancel recording button */}
                     {isRecording && (
-                        <button 
-                            type="button" 
-                            className="mi-icon-btn" 
+                        <button
+                            type="button"
+                            className="mi-icon-btn"
                             onClick={cancelRecording}
                             title="Cancel"
                         >

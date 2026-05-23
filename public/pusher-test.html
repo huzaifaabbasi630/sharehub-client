@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pusher Test</title>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+</head>
+<body>
+    <h1>Pusher Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="events"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const eventsDiv = document.getElementById('events');
+
+        // Initialize Pusher
+        const pusher = new Pusher('df2e25404b966957efa0', {
+            cluster: 'us2',
+            encrypted: true
+        });
+
+        statusDiv.textContent = 'Pusher initialized';
+
+        // Subscribe to test channel
+        const channel = pusher.subscribe('room-TEST123');
+
+        channel.bind('pusher:subscription_succeeded', () => {
+            statusDiv.textContent = '✅ Successfully subscribed to room-TEST123';
+            eventsDiv.innerHTML += '<div>✅ Subscribed to channel</div>';
+        });
+
+        channel.bind('pusher:subscription_error', (error) => {
+            statusDiv.textContent = '❌ Subscription error: ' + JSON.stringify(error);
+            eventsDiv.innerHTML += '<div>❌ Subscription error: ' + JSON.stringify(error) + '</div>';
+        });
+
+        // Listen for request-accepted events
+        channel.bind('request-accepted', (data) => {
+            eventsDiv.innerHTML += '<div>🎉 REQUEST ACCEPTED: ' + JSON.stringify(data) + '</div>';
+            alert('Request accepted! Data: ' + JSON.stringify(data));
+        });
+
+        // Listen for all events
+        channel.bind_global((eventName, data) => {
+            eventsDiv.innerHTML += '<div>📡 Global event: ' + eventName + ' - ' + JSON.stringify(data) + '</div>';
+        });
+
+        // Test button
+        setTimeout(() => {
+            fetch('http://localhost:5000/api/test-accept/TEST123', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                eventsDiv.innerHTML += '<div>🚀 Test request sent: ' + JSON.stringify(data) + '</div>';
+            })
+            .catch(error => {
+                eventsDiv.innerHTML += '<div>❌ Test request failed: ' + error + '</div>';
+            });
+        }, 2000);
+    </script>
+</body>
+</html>

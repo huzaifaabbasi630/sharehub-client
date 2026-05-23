@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { usePusher } from '../context/PusherContext';
+import { useSocket } from '../context/SocketContext';
 import { useRoom } from '../context/RoomContext';
 import { generateRoomCode } from '../utils/generateRoomCode';
 import { createRoom, acceptJoinRequest, rejectJoinRequest } from '../services/api';
@@ -416,7 +416,7 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
           </div>
 
           {/* QR + waiting row */}
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }} className="mobile-flex-col">
             {/* QR */}
             <div style={{
               background: 'rgba(255,255,255,0.97)',
@@ -425,20 +425,20 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
               flexShrink: 0,
             }}>
-              <QRCodeSVG value={joinUrl} size={130} />
+              <QRCodeSVG value={joinUrl} size={120} />
               <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Scan to join</p>
             </div>
 
             {/* Waiting state */}
             <div style={{
-              flex: 1,
+              flex: '1 1 160px',
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid rgba(255,255,255,0.06)',
               borderRadius: '16px',
               padding: '20px',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: '14px', minHeight: '172px',
-            }}>
+              gap: '14px', minHeight: '148px',
+            }} className="mobile-w-full">
               <div style={{ position: 'relative', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(79,142,247,0.15)', animation: 'glow-pulse 2s ease-in-out infinite' }} />
                 <div className="spinner" />
@@ -447,11 +447,10 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
                 <p style={{ fontFamily: "'Syne',sans-serif", fontSize: '14px', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                   Waiting…
                 </p>
-                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12.5px', color: 'var(--muted)', lineHeight: '1.5' }}>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5' }}>
                   Share the code or QR — people can join once approved
                 </p>
               </div>
-              {/* Online indicator */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div className="ping-dot" />
                 <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: 'rgba(56,232,196,0.7)' }}>You're live</span>
@@ -482,7 +481,7 @@ const CreatedStep = ({ roomName, roomCode, joinUrl, copied, onCopy, joinRequests
 function CreateRoom() {
   const navigate = useNavigate();
   const { setRoomData, setUserData, room, user } = useRoom();
-  const { emit, bind, unbind, subscribe, isConnected } = usePusher();
+  const { emit, on, off, isConnected } = useSocket();
 
   const [step, setStep] = useState('form');
   const [roomName, setRoomName] = useState('');
@@ -491,17 +490,18 @@ function CreateRoom() {
   const [joinRequests, setJoinRequests] = useState([]);
   const [copied, setCopied] = useState({ code: false, link: false });
 
-  // Initialize Pusher when component mounts
+  // Initialize Socket join listener when component mounts or room changes
   useEffect(() => {
     if (room?.code) {
-      subscribe(`room-${room.code}`);
+      console.log('📡 Subscribing to room events via Socket.io:', room.code);
 
       const handleJoinReq = (data) => {
-        console.log('Join request received via Pusher:', data);
+        console.log('Join request received via Socket.io:', data);
         const normalizedData = {
           ...data,
-          requestId: data.user?.id || data.requestId || `req-${Date.now()}`,
-          userName: data.user?.name || data.userName || data.requesterName || 'Unknown',
+          requestId: data.requestId || data.user?.id || `req-${Date.now()}`,
+          userName: data.userName || data.user?.name || data.requesterName || 'Unknown',
+          requesterId: data.requesterId || data.user?.id || data.socketId
         };
         setJoinRequests(prev => {
           if (prev.find(r => r.requestId === normalizedData.requestId)) return prev;
@@ -509,32 +509,17 @@ function CreateRoom() {
         });
       };
 
-      // Bind to join-request (from server)
-      bind('join-request', handleJoinReq);
-
-      // Also bind to old event name just in case
-      bind('join_request_received', handleJoinReq);
+      // Listen for join_request_received (broadcast to room)
+      on('join_request_received', handleJoinReq);
 
       // Clean up on unmount
       return () => {
-        unbind('join-request');
-        unbind('join_request_received');
+        off('join_request_received', handleJoinReq);
       };
     }
-  }, [room?.code, bind, unbind, subscribe]);
+  }, [room?.code, on, off]);
 
   const joinUrl = roomCode ? `${window.location.origin}/join?code=${roomCode}` : '';
-
-  useEffect(() => {
-    // Listen for acceptance confirmation if needed
-    bind('request-accepted', (data) => {
-      console.log('Request accepted confirmed:', data);
-    });
-
-    return () => {
-      unbind('request-accepted');
-    };
-  }, [bind, unbind]);
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
@@ -554,41 +539,10 @@ function CreateRoom() {
       if (response.success) {
         setRoomData(response.room);
         setUserData({ name: userName, isHost: true });
+
+        // Tell server to join this room's socket channel
+        emit('join_room', { roomCode: code, userName, isHost: true });
         emit('create_room', { roomCode: code, userName });
-
-        // Save to created rooms history
-        const createdRooms = JSON.parse(localStorage.getItem('sharehub_created_rooms') || '[]');
-        if (!createdRooms.includes(code)) {
-          createdRooms.push(code);
-          localStorage.setItem('sharehub_created_rooms', JSON.stringify(createdRooms));
-        }
-
-        // Save to room history
-        const history = JSON.parse(localStorage.getItem('sharehub_room_history') || '[]');
-        const roomEntry = {
-          code,
-          name: roomName,
-          createdAt: new Date().toISOString(),
-          _id: response.room?._id || code,
-        };
-        const existingIndex = history.findIndex(r => r.code === code);
-        if (existingIndex >= 0) {
-          history[existingIndex] = roomEntry;
-        } else {
-          history.unshift(roomEntry);
-        }
-        localStorage.setItem('sharehub_room_history', JSON.stringify(history.slice(0, 20)));
-
-        // Save current room data for restoration from history
-        localStorage.setItem('sharehub_current_room', JSON.stringify(roomEntry));
-        localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: true }));
-
-        // Clear any existing data for this room code to start fresh
-        localStorage.removeItem(`sharehub_messages_${code}`);
-        localStorage.removeItem(`sharehub_files_${code}`);
-        localStorage.removeItem(`sharehub_secure_${code}`);
-        localStorage.removeItem(`sharehub_screenshots_${code}`);
-        localStorage.removeItem(`sharehub_join_requests_${code}`);
 
         setStep('created');
       }
@@ -599,17 +553,21 @@ function CreateRoom() {
   };
 
   const handleApproveJoin = async (requestId, requesterId, requesterName) => {
-    console.log('Approving join:', { requestId, requesterId, roomCode, requesterName });
+    console.log('Approving join via API & Socket:', { requestId, requesterId, roomCode, requesterName });
     try {
-      await acceptJoinRequest(roomCode, `/room/${roomCode}`, userName);
+      // We still call the API because it handles the logic on the server
+      // and my updated API now emits Socket.io events too!
+      await acceptJoinRequest(roomCode, `/room/${roomCode}`, userName, requesterId, requesterName);
+
+      // Optionally also emit directly from client if needed
+      // emit('approve_join', { requestId, requesterId, roomCode, requesterName });
+
       setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
 
-      // Save room data before navigating
-      const roomData = { code: roomCode, name: roomName, _id: roomCode };
-      localStorage.setItem('sharehub_current_room', JSON.stringify(roomData));
-      localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: true }));
-
-      navigate(`/room/${roomCode}`);
+      // Short delay to ensure event is sent before navigating
+      setTimeout(() => {
+        navigate(`/room/${roomCode}`);
+      }, 300);
     } catch (err) {
       console.error('Approval failed:', err);
     }
@@ -617,7 +575,7 @@ function CreateRoom() {
 
   const handleRejectJoin = async (requestId, requesterId) => {
     try {
-      await rejectJoinRequest(roomCode, requestId);
+      await rejectJoinRequest(roomCode, requesterId);
       setJoinRequests(prev => prev.filter(req => req.requestId !== requestId));
     } catch (err) {
       console.error('Rejection failed:', err);
@@ -630,19 +588,14 @@ function CreateRoom() {
     setTimeout(() => setCopied(prev => ({ ...prev, [type]: false })), 2000);
   };
 
-  // Handle refresh - reset form without page reload
   const handleRefresh = () => {
     if (step === 'form') {
       setRoomName('');
       setUserName('');
-      setError('');
     } else {
-      // Reset to form step
       setStep('form');
       setRoomName('');
       setRoomCode('');
-      setJoinUrl('');
-      setError('');
     }
   };
 

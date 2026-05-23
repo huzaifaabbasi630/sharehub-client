@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
-import { usePusher } from '../context/PusherContext'; // Using Pusher instead
+import { useSocket } from '../context/SocketContext';
 
 const S = () => (
   <style>{`
@@ -277,19 +276,20 @@ import { acceptJoinRequest, rejectJoinRequest } from '../services/api';
 
 function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest, onRejectRequest }) {
   const [joinRequests, setJoinRequests] = useState([]);
-  const { bind, unbind, subscribe, emit } = usePusher();
+  const { on, off, emit } = useSocket();
 
   // Subscribe to room events when component mounts
   useEffect(() => {
     if (isHost && roomCode) {
-      subscribe(`room-${roomCode}`);
+      console.log('📡 Sidebar listening for join requests via Socket.io for room:', roomCode);
 
       const handleJoinReq = (data) => {
-        console.log('Sidebar received join request via Pusher:', data);
+        console.log('Sidebar received join request via Socket.io:', data);
         const normalizedData = {
           ...data,
-          requestId: data.user?.id || data.requestId || `req-${Date.now()}`,
-          userName: data.user?.name || data.userName || data.requesterName || 'Unknown',
+          requestId: data.requestId || data.user?.id || `req-${Date.now()}`,
+          userName: data.userName || data.user?.name || data.requesterName || 'Unknown',
+          requesterId: data.requesterId || data.user?.id
         };
         setJoinRequests(prev => {
           if (prev.find(r => r.requestId === normalizedData.requestId)) return prev;
@@ -297,22 +297,17 @@ function Sidebar({ participants, currentUser, isHost, roomCode, onApproveRequest
         });
       };
 
-      // Bind to join-request (from server)
-      bind('join-request', handleJoinReq);
-
-      // Also bind to old event name just in case
-      bind('join_request_received', handleJoinReq);
+      on('join_request_received', handleJoinReq);
 
       return () => {
-        unbind('join-request');
-        unbind('join_request_received');
+        off('join_request_received', handleJoinReq);
       };
     }
-  }, [roomCode, isHost, bind, unbind, subscribe]);
+  }, [roomCode, isHost, on, off]);
 
   const handleApprove = async (request) => {
     try {
-      await acceptJoinRequest(roomCode, `/room/${roomCode}`, currentUser.name);
+      await acceptJoinRequest(roomCode, `/room/${roomCode}`, currentUser.name, request.requesterId, request.userName);
       setJoinRequests(prev => prev.filter(r => r.requestId !== request.requestId));
       if (onApproveRequest) onApproveRequest(request);
     } catch (err) {

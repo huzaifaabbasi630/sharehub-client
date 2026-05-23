@@ -1,47 +1,32 @@
-// Shared state management for cross-tab and same-tab communication
-// This solves the issue where localStorage events don't fire in the same tab
+// Shared state management — IN-MEMORY ONLY (no localStorage persistence)
+// Uses a pub/sub pattern for cross-component communication within the same tab.
 
+const store = new Map();
 const listeners = new Map();
 
 export const sharedState = {
-  // Set value and notify all listeners (same tab + other tabs via localStorage)
+  // Set value and notify all listeners
   set(key, value) {
-    // Save to localStorage (for other tabs)
-    localStorage.setItem(key, JSON.stringify(value));
-    
-    // Notify same-tab listeners
+    store.set(key, value);
     this.notify(key, value);
-    
-    // Also dispatch storage event for other tabs
-    window.dispatchEvent(new StorageEvent('storage', {
-      key,
-      newValue: JSON.stringify(value)
-    }));
   },
 
-  // Get value from localStorage
+  // Get value from in-memory store
   get(key, defaultValue = null) {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return defaultValue;
-      }
-    }
-    return defaultValue;
+    return store.has(key) ? store.get(key) : defaultValue;
   },
 
-  // Subscribe to changes
+  // Subscribe to changes for a key
   subscribe(key, callback) {
     if (!listeners.has(key)) {
       listeners.set(key, new Set());
     }
     listeners.get(key).add(callback);
-    
+
     // Return unsubscribe function
     return () => {
-      listeners.get(key).delete(callback);
+      const keyListeners = listeners.get(key);
+      if (keyListeners) keyListeners.delete(callback);
     };
   },
 
@@ -60,21 +45,15 @@ export const sharedState = {
 
   // Remove item
   remove(key) {
-    localStorage.removeItem(key);
+    store.delete(key);
     this.notify(key, null);
+  },
+
+  // Clear all data (call on room leave)
+  clear() {
+    store.clear();
+    listeners.clear();
   }
 };
-
-// Also listen to real storage events (from other tabs)
-window.addEventListener('storage', (e) => {
-  if (e.newValue) {
-    try {
-      const value = JSON.parse(e.newValue);
-      sharedState.notify(e.key, value);
-    } catch (e) {
-      sharedState.notify(e.key, e.newValue);
-    }
-  }
-});
 
 export default sharedState;

@@ -316,6 +316,7 @@ const PricingModal = ({ onClose }) => {
 ═══════════════════════════════════════════ */
 const Navbar = ({ user, onLogout, scrolled, onHistoryClick, onGuestHistoryClick }) => {
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleHistoryClick = () => {
     if (user?.isGuest) {
@@ -355,8 +356,8 @@ const Navbar = ({ user, onLogout, scrolled, onHistoryClick, onGuestHistoryClick 
           <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: '800', fontSize: '19px', color: 'var(--text)', letterSpacing: '-0.5px' }}>ShareHub</span>
         </div>
 
-        {/* Nav links */}
-        <div style={{ display: 'flex', gap: '36px', alignItems: 'center' }}>
+        {/* Desktop Nav links */}
+        <div className="mobile-hidden" style={{ display: 'flex', gap: '36px', alignItems: 'center' }}>
           <button className="nav-link" onClick={handleHistoryClick} style={{ color: '#fbbf24' }}>
             📜 History
           </button>
@@ -365,8 +366,23 @@ const Navbar = ({ user, onLogout, scrolled, onHistoryClick, onGuestHistoryClick 
           ))}
         </div>
 
-        {/* Right side */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Mobile hamburger button */}
+        <button
+          className="desktop-hidden"
+          style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: '8px' }}
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            {mobileMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
+
+        {/* Desktop Right side */}
+        <div className="mobile-hidden" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {user?.isGuest && (
             <span style={{
               fontFamily: "'DM Sans', sans-serif",
@@ -417,7 +433,98 @@ const Navbar = ({ user, onLogout, scrolled, onHistoryClick, onGuestHistoryClick 
             </svg>
           </button>
         </div>
+
+        {/* Mobile menu button */}
+        <button
+          className="desktop-hidden"
+          style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: '8px' }}
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            {mobileMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
       </div>
+
+      {/* Mobile menu dropdown */}
+      {mobileMenuOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '70px',
+          left: 0,
+          right: 0,
+          background: 'rgba(3,5,15,0.95)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          padding: '20px 28px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}>
+          <button className="nav-link" onClick={() => { handleHistoryClick(); setMobileMenuOpen(false); }} style={{ color: '#fbbf24', textAlign: 'left', padding: '12px 0' }}>
+            📜 History
+          </button>
+          {['Features', 'Pricing', 'About'].map(l => (
+            <button key={l} className="nav-link" onClick={() => { navigate(`/${l.toLowerCase()}`); setMobileMenuOpen(false); }} style={{ textAlign: 'left', padding: '12px 0' }}>{l}</button>
+          ))}
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '8px 0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {user?.isGuest && (
+                <span style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: '11px', fontWeight: '600',
+                  padding: '4px 11px', borderRadius: '20px',
+                  background: 'rgba(251,191,36,0.1)',
+                  color: '#fbbf24',
+                  border: '1px solid rgba(251,191,36,0.2)',
+                  letterSpacing: '0.3px',
+                }}>Guest</span>
+              )}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '12px', padding: '7px 14px',
+              }}>
+                <div style={{
+                  width: '30px', height: '30px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent1), #6a5af7)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: "'Syne', sans-serif", color: '#fff', fontSize: '13px', fontWeight: '700',
+                }}>
+                  {user?.name?.charAt(0).toUpperCase()}
+                </div>
+                <span style={{ fontFamily: "'DM Sans', sans-serif", color: '#c8d0e7', fontSize: '13.5px', fontWeight: '500' }}>{user?.name}</span>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              title="Logout"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '11px',
+                color: 'var(--muted)',
+                width: '38px', height: '38px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; e.currentTarget.style.color = '#f87171'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

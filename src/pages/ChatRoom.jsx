@@ -78,6 +78,7 @@ const S = () => (
       flex: 1;
       display: flex;
       overflow: hidden;
+      position: relative;
     }
 
     /* ── Sidebar override zone ── */
@@ -89,6 +90,8 @@ const S = () => (
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      transition: transform 0.3s ease;
+      z-index: 50;
     }
 
     /* ── Main chat column ── */
@@ -99,6 +102,7 @@ const S = () => (
       overflow: hidden;
       background: var(--bg);
       position: relative;
+      min-width: 0;
     }
 
     /* Subtle dot grid on chat bg */
@@ -179,20 +183,90 @@ const S = () => (
       animation: spin 0.85s linear infinite;
     }
 
-    /* ── Responsive sidebar hide ── */
-    @media (max-width: 640px) {
-      .cr-sidebar-wrap { display: none; }
+    /* ── Mobile Sidebar Drawer ── */
+    @media (max-width: 1023px) {
+      .cr-sidebar-wrap {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 300;
+        transform: translateX(-100%);
+        box-shadow: 4px 0 32px rgba(0,0,0,0.6);
+      }
+      .cr-sidebar-wrap.open {
+        transform: translateX(0);
+      }
+      .cr-sidebar-overlay {
+        display: block;
+      }
     }
+    @media (min-width: 1024px) {
+      .cr-sidebar-wrap {
+        position: relative;
+        transform: none !important;
+      }
+      .cr-sidebar-overlay {
+        display: none !important;
+      }
+    }
+
+    /* Mobile overlay backdrop */
+    .cr-sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(3,5,15,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 299;
+    }
+
+    /* ── Responsive toast stack ── */
+    @media (max-width: 640px) {
+      .cr-toast-stack {
+        top: auto !important;
+        bottom: 80px;
+        right: 8px !important;
+        left: 8px;
+        max-width: 100% !important;
+      }
+    }
+
+    /* ── Feature buttons bar scroll ── */
+    .cr-feature-bar {
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cr-feature-bar::-webkit-scrollbar { height: 0; }
+    .cr-feature-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: none;
+      border-radius: 20px;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .cr-feature-btn:hover { opacity: 0.85; transform: translateY(-1px); }
   `}</style>
 );
 
 function ChatRoom() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
-  // const { emit, on, off } = useSocket(); // WebSocket disabled
-  const emit = () => {};
-  const on = () => {};
-  const off = () => {};
+  const { emit, on, off, socket } = useSocket();
   const {
     room,
     user,
@@ -212,82 +286,68 @@ function ChatRoom() {
 
   // Clear messages when room changes to prevent showing previous room's chat
   useEffect(() => {
-    // Clear both React state and localStorage for this room
     setMessageList([]);
-    localStorage.removeItem(`sharehub_messages_${roomCode}`);
   }, [roomCode, setMessageList]);
 
   const [showCallPanel, setShowCallPanel] = useState(false);
   const [callType, setCallType] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const messagesEndRef = useRef(null);
-  
+
   // Feature states
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showFileOrganizer, setShowFileOrganizer] = useState(false);
   const [showEducationMode, setShowEducationMode] = useState(false);
   const [showSecureRoom, setShowSecureRoom] = useState(false);
   const [sharedFiles, setSharedFiles] = useState([]);
-  
+
   // Join request toast notifications
   const [joinRequestToasts, setJoinRequestToasts] = useState([]);
-  
+
   // Security features
   const [watermarkText, setWatermarkText] = useState('');
   const [watermarkSize, setWatermarkSize] = useState('9xl'); // Default size
   const [showAutoDeleteToast, setShowAutoDeleteToast] = useState(false);
+  const [callInvite, setCallInvite] = useState(null);
+  const [activeQuiz, setActiveQuiz] = useState(null);
+  const [selectedQuizOption, setSelectedQuizOption] = useState(null);
+  const [attendanceRequest, setAttendanceRequest] = useState(null);
+  const [attendanceList, setAttendanceList] = useState([]); // Master list for creator
+  const [creatorNotifications, setCreatorNotifications] = useState([]); // Toast list for creator notifications
+
+  // AI Feature States
+  const [smartReplies, setSmartReplies] = useState({}); // { messageId: [replies] }
+  const [chatSummary, setChatSummary] = useState(null);
+  const [isImproving, setIsImproving] = useState(false);
+  const [translatedMessages, setTranslatedMessages] = useState({}); // { messageId: translatedContent }
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [improvedText, setImprovedText] = useState('');
 
   useEffect(() => {
+    on('improved_message_result', (data) => {
+      setImprovedText(data.improved);
+      setIsImproving(false);
+      // Clear after a moment so it can be triggered again with same text if needed
+      setTimeout(() => setImprovedText(''), 100);
+    });
+
     console.log('ChatRoom useEffect triggered, roomCode:', roomCode);
     console.log('Current watermarkText state:', watermarkText);
-    
+
     // Check if security settings exist
     const existingSettings = sharedState.get(`sharehub_secure_${roomCode}`);
     console.log('Existing security settings:', existingSettings);
-    
-    // Try to restore room/user from localStorage if context is empty
+
+    // Room/user data should come from React context (in-memory), not localStorage
     if (!room || !user) {
-      const savedRoom = localStorage.getItem('sharehub_current_room');
-      const savedUser = localStorage.getItem('sharehub_current_user');
-      
-      if (savedRoom && savedUser) {
-        try {
-          const roomData = JSON.parse(savedRoom);
-          const userData = JSON.parse(savedUser);
-          
-          // Only restore if the saved room matches current URL
-          if (roomData.code === roomCode) {
-            setRoomData(roomData);
-            setUserData(userData.name, userData.isHost);
-            return; // Don't navigate away, data restored
-          }
-        } catch (e) {
-          console.error('Error restoring room data:', e);
-        }
-      }
-      
-      // No saved data or mismatch, redirect to home
+      // No context data, redirect to home
       navigate('/');
       return;
     }
 
-    if (!isHost) {
-      const history = JSON.parse(localStorage.getItem('sharehub_room_history') || '[]');
-      const existingIndex = history.findIndex(r => r.code === roomCode);
-      const roomEntry = {
-        code: roomCode,
-        name: room.name,
-        joinedAt: new Date().toISOString(),
-      };
-      if (existingIndex >= 0) {
-        history[existingIndex] = roomEntry;
-      } else {
-        history.unshift(roomEntry);
-      }
-      localStorage.setItem('sharehub_room_history', JSON.stringify(history.slice(0, 10)));
-    }
 
-    emit('join_room', { roomCode, userName: user.name, isHost });
+
+    emit('join_room', { roomCode: roomCode.toUpperCase(), userName: user.name, isHost });
 
     // Listen for screenshot detections (for ALL members)
     const unsubscribeScreenshots = sharedState.subscribe(`sharehub_screenshots_${roomCode}`, (reports) => {
@@ -306,7 +366,7 @@ function ChatRoom() {
             type: 'system'
           };
           addMessage(toastMessage);
-          
+
           // Show visual toast for 5 seconds
           if (isHost) {
             setShowAutoDeleteToast(true);
@@ -327,7 +387,7 @@ function ChatRoom() {
           const latestRequest = pendingRequests[pendingRequests.length - 1];
           const requestTime = new Date(latestRequest.timestamp).getTime();
           const now = Date.now();
-          
+
           // Only show if it's a new request (within last 5 seconds)
           if (now - requestTime < 5000) {
             // Check if this toast is already showing
@@ -340,7 +400,7 @@ function ChatRoom() {
                 isHost: isHost
               };
               setJoinRequestToasts(prev => [...prev, newToast]);
-              
+
               // Auto-remove after 4 seconds
               setTimeout(() => {
                 setJoinRequestToasts(prev => prev.filter(t => t.requestId !== latestRequest.requestId));
@@ -364,38 +424,26 @@ function ChatRoom() {
           type: 'system'
         };
         addMessage(systemMessage);
-        
+
         // Auto-remove toast after 5 seconds
         setTimeout(() => {
           setShowAutoDeleteToast(false);
         }, 5000);
       }
     };
-    
+
     on('security_auto_delete', handleAutoDelete);
 
     // Load security settings for all users (watermark, etc.)
     const loadSecuritySettings = () => {
       console.log('Loading security settings for room:', roomCode);
-      
+
       // Try sharedState first
       let settings = sharedState.get(`sharehub_secure_${roomCode}`);
       console.log('Found security settings from sharedState:', settings);
-      
-      // If not found, try direct localStorage
-      if (!settings) {
-        const localStorageData = localStorage.getItem(`sharehub_secure_${roomCode}`);
-        console.log('Checking localStorage directly:', localStorageData);
-        if (localStorageData) {
-          try {
-            settings = JSON.parse(localStorageData);
-            console.log('Parsed settings from localStorage:', settings);
-          } catch (e) {
-            console.error('Error parsing localStorage data:', e);
-          }
-        }
-      }
-      
+
+
+
       if (settings) {
         if (settings.watermarkText) {
           console.log('Setting watermark text:', settings.watermarkText);
@@ -409,10 +457,10 @@ function ChatRoom() {
         if (settings.selfDestructFiles && settings.customExpiryTime) {
           const timeValue = parseInt(settings.customExpiryTime);
           const timeUnit = settings.customExpiryTime.replace(/\d+/g, '').toLowerCase();
-              
+
           let expiryTime = null;
           if (timeValue && timeUnit) {
-            switch(timeUnit) {
+            switch (timeUnit) {
               case 'm':
               case 'min':
               case 'mins':
@@ -432,51 +480,38 @@ function ChatRoom() {
                 expiryTime = timeValue * 60 * 1000;
             }
           }
-              
+
           if (expiryTime) {
             console.log('Setting up auto-delete timer for', expiryTime, 'ms');
-            // Schedule message deletion for all users
             setTimeout(() => {
               console.log('Auto-deleting messages for room:', roomCode);
-              localStorage.removeItem(`sharehub_messages_${roomCode}`);
-              // Reload messages to clear the UI
-              const savedMessages = localStorage.getItem(`sharehub_messages_${roomCode}`);
-              if (savedMessages) {
-                try {
-                  const parsedMessages = JSON.parse(savedMessages);
-                  setMessageList(parsedMessages);
-                } catch (e) {
-                  setMessageList([]);
-                }
-              } else {
-                setMessageList([]);
-              }
+              setMessageList([]);
             }, expiryTime);
           }
         }
       }
     };
-        
+
     // Call the function immediately
     loadSecuritySettings();
-        
+
     // Also call it after a small delay to ensure sharedState is ready
     setTimeout(() => {
       console.log('Retrying security settings load...');
       loadSecuritySettings();
     }, 1000);
-    
+
     // Periodic check every 3 seconds for the first 30 seconds
     const interval = setInterval(() => {
       console.log('Periodic security settings check...');
       loadSecuritySettings();
     }, 3000);
-    
+
     // Clear interval after 30 seconds
     setTimeout(() => {
       clearInterval(interval);
     }, 30000);
-    
+
     // Subscribe to security settings changes for all users
     const unsubscribeSecurity = sharedState.subscribe(`sharehub_secure_${roomCode}`, (newSettings) => {
       console.log('Received security settings update via sharedState:', newSettings);
@@ -488,61 +523,15 @@ function ChatRoom() {
         // Handle other security settings changes
       }
     });
-    
-    // Also listen for direct localStorage changes
-    const handleStorageChange = (e) => {
-      if (e.key === `sharehub_secure_${roomCode}`) {
-        console.log('Detected localStorage change for security settings:', e.newValue);
-        if (e.newValue) {
-          try {
-            const settings = JSON.parse(e.newValue);
-            if (settings.watermarkText) {
-              console.log('Updating watermark from storage event:', settings.watermarkText);
-              setWatermarkText(settings.watermarkText);
-            }
-          } catch (err) {
-            console.error('Error parsing storage event data:', err);
-          }
-        }
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Cleanup function
-    const cleanup = () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+
+    // No localStorage event listeners needed - using in-memory sharedState only
 
     const loadMessages = async () => {
       try {
-        // First load saved messages from localStorage to preserve chats
-        const savedMessages = localStorage.getItem(`sharehub_messages_${roomCode}`);
-        if (savedMessages) {
-          try {
-            const parsedMessages = JSON.parse(savedMessages);
-            setMessageList(parsedMessages);
-          } catch (e) {
-            console.error('Error parsing saved messages:', e);
-          }
-        }
-        
-        // Then fetch from server and merge
+        // Fetch messages from server only
         const response = await getMessages(room._id);
         if (response.success && response.messages) {
-          const serverMessages = response.messages;
-          const currentMessages = JSON.parse(localStorage.getItem(`sharehub_messages_${roomCode}`) || '[]');
-          
-          // Merge server messages with local, avoiding duplicates
-          const existingIds = new Set(currentMessages.map(m => m._id || m.id || m.timestamp));
-          const newMessages = serverMessages.filter(m => !existingIds.has(m._id || m.id || m.timestamp));
-          
-          if (newMessages.length > 0) {
-            const mergedMessages = [...currentMessages, ...newMessages];
-            mergedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            setMessageList(mergedMessages);
-            localStorage.setItem(`sharehub_messages_${roomCode}`, JSON.stringify(mergedMessages));
-          }
+          setMessageList(response.messages);
         }
       } catch (error) {
         console.error('Error loading messages:', error);
@@ -550,8 +539,8 @@ function ChatRoom() {
     };
     loadMessages();
 
-    on('joined_room',   (data) => console.log('Joined room:', data));
-    on('user_joined',   (data) => {
+    on('joined_room', (data) => console.log('Joined room:', data));
+    on('user_joined', (data) => {
       console.log('User joined:', data);
       // Normalize participant data - ensure name field exists
       const normalizedData = {
@@ -560,33 +549,106 @@ function ChatRoom() {
       };
       addParticipant(normalizedData);
     });
-    on('user_left',     (data) => removeParticipant(data.socketId));
-    on('new_message',   (message) => addMessage(message));
-    on('user_typing',   (data) => setTypingStatus(data.userName, data.isTyping));
-    on('incoming_call', (data) => { setCallType(data.callType); setShowCallPanel(true); });
-    on('error',         (error) => console.error('Socket error:', error));
-    
+    on('user_left', (data) => removeParticipant(data.socketId));
+    on('new_message', (message) => addMessage(message));
+    on('user_typing', (data) => setTypingStatus(data.userName, data.isTyping));
+    on('incoming_call', (data) => {
+      console.log('Incoming call notification:', data);
+      setCallInvite(data);
+      // Auto-hide after 30s
+      setTimeout(() => setCallInvite(null), 30000);
+    });
+    on('call_ended', () => setCallInvite(null));
+
+    // ── Education Mode Handlers ──
+    on('incoming_quiz', (quiz) => {
+      console.log('Incoming Quiz:', quiz);
+      setActiveQuiz(quiz);
+    });
+
+    on('quiz_response_received', (data) => {
+      // Creator collects student answers
+      if (isHost) {
+        setCreatorNotifications(prev => [
+          ...prev,
+          { id: Date.now() + Math.random(), type: 'quiz', userName: data.userName, answer: data.optionIndex, ts: new Date() }
+        ]);
+        setTimeout(() => setCreatorNotifications(curr => curr.slice(1)), 5000);
+      }
+
+      setActiveQuiz(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          responses: {
+            ...prev.responses,
+            [data.userName]: data.optionIndex
+          }
+        };
+      });
+    });
+
+    on('attendance_request', (data) => {
+      // Students see the request
+      if (!isHost && (data.targetName === user?.name || !data.targetName)) {
+        setAttendanceRequest({ ...data, id: data.id || Date.now() });
+        // Timeout for "Not Responding" - if not responded in 45s
+        setTimeout(() => {
+          setAttendanceRequest(prev => {
+            if (prev && prev.id === data.id) {
+              // Notify creator that user didn't respond? 
+              // Actually the creator can just check the list after X seconds.
+              return null;
+            }
+            return prev;
+          });
+        }, 45000);
+      }
+    });
+
+    on('attendance_response', (data) => {
+      // Host shows a notification toast
+      if (isHost) {
+        const toastId = Math.random();
+        setCreatorNotifications(prev => [...prev, { id: toastId, type: 'attendance', userName: data.userName, status: data.status }]);
+        setTimeout(() => setCreatorNotifications(curr => curr.filter(n => n.id !== toastId)), 5000);
+      }
+
+      // Update verified status for everyone
+      setAttendanceList(prev => prev.map(a =>
+        a.name === data.userName ? { ...a, status: data.status, confirmed: true } : a
+      ));
+    });
+
+    on('error', (error) => console.error('Socket error:', error));
+
+    on('ai_smart_replies', (data) => {
+      setSmartReplies(prev => ({ ...prev, [data.messageId]: data.replies }));
+    });
+
+    on('chat_summary_result', (data) => {
+      setChatSummary(data.summary);
+      setIsSummarizing(false);
+    });
+
+    on('improved_message_result', (data) => {
+      setIsImproving(false);
+    });
+
+    on('translated_message_result', (data) => {
+      setTranslatedMessages(prev => ({ ...prev, [data.originalText]: data.translated }));
+    });
+
     // Listen for security settings broadcast from creator
     const handleSecurityBroadcast = (data) => {
-      console.log('Received security settings broadcast:', data);
       if (data.roomCode === roomCode.toUpperCase()) {
-        console.log('Applying broadcasted security settings:', data.settings);
-        // Save to local storage
-        localStorage.setItem(`sharehub_secure_${roomCode}`, JSON.stringify(data.settings));
-        // Update state
-        if (data.settings.watermarkText) {
-          console.log('Setting watermark from broadcast:', data.settings.watermarkText);
-          setWatermarkText(data.settings.watermarkText);
-        }
-        if (data.settings.watermarkSize) {
-          console.log('Setting watermark size from broadcast:', data.settings.watermarkSize);
-          setWatermarkSize(data.settings.watermarkSize);
-        }
-        // Also update sharedState for consistency
+        // Update in-memory sharedState
         sharedState.set(`sharehub_secure_${roomCode}`, data.settings);
+        if (data.settings.watermarkText) setWatermarkText(data.settings.watermarkText);
+        if (data.settings.watermarkSize) setWatermarkSize(data.settings.watermarkSize);
       }
     };
-    
+
     on('security_settings_broadcast', handleSecurityBroadcast);
 
     return () => {
@@ -596,34 +658,33 @@ function ChatRoom() {
       off('new_message');
       off('user_typing');
       off('incoming_call');
+      off('call_ended');
+      off('ai_smart_replies');
+      off('chat_summary_result');
+      off('improved_message_result');
+      off('translated_message_result');
       off('error');
       off('security_auto_delete', handleAutoDelete);
       off('security_settings_broadcast', handleSecurityBroadcast);
       unsubscribeScreenshots();
       unsubscribeJoinRequests();
       unsubscribeSecurity();
-      cleanup(); // Remove storage event listener
     };
   }, [room, user, roomCode, isHost, emit, on, off, navigate,
-      addParticipant, removeParticipant, addMessage, setMessageList, setTypingStatus, joinRequestToasts]);
+    addParticipant, removeParticipant, addMessage, setMessageList, setTypingStatus, joinRequestToasts]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    if (messages.length > 0 && roomCode) {
-      localStorage.setItem(`sharehub_messages_${roomCode}`, JSON.stringify(messages));
-    }
-  }, [messages, roomCode]);
+  // (No localStorage persistence for messages — server is source of truth)
 
   const handleSendMessage = (content, type = 'text', fileUrl = null, fileName = null) => {
     if (!content.trim() && !fileUrl) return;
     emit('send_message', {
-      roomId: room._id,
-      roomCode,
-      senderId: user.socketId || 'unknown',
+      roomId: room._id || roomCode,
+      roomCode: roomCode.toUpperCase(),
+      senderId: socket?.id || user.name,
       senderName: user.name,
       content, type, fileUrl, fileName,
     });
@@ -637,11 +698,12 @@ function ChatRoom() {
     setCallType(type);
     setShowCallPanel(true);
     emit('start_call', {
-      roomId: room._id,
-      roomCode,
-      callerId: user.socketId || 'unknown',
+      roomId: room._id || roomCode,
+      roomCode: roomCode.toUpperCase(),
+      callerId: socket?.id || 'unknown',
       callerName: user.name,
       callType: type,
+      isHost: isHost
     });
   };
 
@@ -660,14 +722,14 @@ function ChatRoom() {
     const requests = sharedState.get(`sharehub_join_requests_${roomCode}`, []);
     const request = requests.find(r => r.requestId === requestId);
     if (request) {
-      const updatedRequests = requests.map(r => 
+      const updatedRequests = requests.map(r =>
         r.requestId === requestId ? { ...r, status: 'approved' } : r
       );
       sharedState.set(`sharehub_join_requests_${roomCode}`, updatedRequests);
-      
+
       // Remove from toasts
       setJoinRequestToasts(prev => prev.filter(t => t.requestId !== requestId));
-      
+
       // Add system message
       const systemMessage = {
         _id: `approve_${Date.now()}`,
@@ -685,14 +747,14 @@ function ChatRoom() {
     const requests = sharedState.get(`sharehub_join_requests_${roomCode}`, []);
     const request = requests.find(r => r.requestId === requestId);
     if (request) {
-      const updatedRequests = requests.map(r => 
+      const updatedRequests = requests.map(r =>
         r.requestId === requestId ? { ...r, status: 'rejected' } : r
       );
       sharedState.set(`sharehub_join_requests_${roomCode}`, updatedRequests);
-      
+
       // Remove from toasts
       setJoinRequestToasts(prev => prev.filter(t => t.requestId !== requestId));
-      
+
       // Add system message
       const systemMessage = {
         _id: `reject_${Date.now()}`,
@@ -711,9 +773,9 @@ function ChatRoom() {
       <>
         <S />
         <div className="cr-null">
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
             <div className="cr-spinner" />
-            <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'14px', color:'var(--muted)' }}>
+            <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: 'var(--muted)' }}>
               Connecting to room…
             </p>
           </div>
@@ -727,119 +789,368 @@ function ChatRoom() {
       <S />
 
       <div className="cr-shell">
-        
-        {/* ── Join Request Toast Notifications ── */}
-        {joinRequestToasts.length > 0 && (
-          <div style={{
-            position: 'fixed',
-            top: '80px',
-            right: '20px',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            maxWidth: '350px',
-          }}>
-            {joinRequestToasts.map((toast) => (
-              <div
-                key={toast.requestId}
-                style={{
-                  position: 'relative',
-                  background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-                  border: '1px solid rgba(79,142,247,0.3)',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
-                  animation: 'slideIn 0.3s ease-out',
-                  overflow: 'hidden',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #4f8ef7, #6a5af7)',
+
+        {/* ── Toast Notifications Stack (Calls & Requests) ── */}
+        <div className="cr-toast-stack" style={{
+          position: 'fixed',
+          top: '80px',
+          right: '20px',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          maxWidth: '350px',
+        }}>
+          {/* Incoming Call Notification */}
+          {callInvite && (
+            <div style={{
+              background: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
+              border: '2px solid #38e8c4',
+              borderRadius: '16px',
+              padding: '18px',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(56,232,196,0.2)',
+              animation: 'slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Pulse effect background */}
+              <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(56,232,196,0.1)', animation: 'glow-pulse 2s infinite' }} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #38e8c4, #4f8ef7)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '22px', border: '2px solid rgba(255,255,255,0.1)'
+                }}>
+                  {callInvite.callType === 'video' ? '📹' : '📞'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, color: '#38e8c4', fontWeight: '800', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Incoming {callInvite.callType === 'video' ? 'Video' : 'Voice'} Call
+                  </p>
+                  <p style={{ margin: '2px 0 0', color: '#fff', fontSize: '15px', fontWeight: '600' }}>
+                    {callInvite.isHost ? 'Creator' : (callInvite.callerName || 'Someone')} is calling...
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    setCallType(callInvite.callType);
+                    setShowCallPanel(true);
+                    setCallInvite(null);
+                  }}
+                  style={{
+                    flex: 2,
+                    padding: '10px',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    border: 'none',
+                    borderRadius: '10px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '18px',
-                  }}>
-                    👤
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, color: '#fff', fontWeight: '600', fontSize: '14px' }}>
-                      Join Request
-                    </p>
-                    <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
-                      <strong style={{ color: '#4f8ef7' }}>{toast.userName}</strong> wants to join
-                    </p>
-                  </div>
-                </div>
-                
-                {toast.isHost ? (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => handleApproveJoinRequest(toast.requestId)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        background: 'linear-gradient(135deg, #10b981, #059669)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: '#fff',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ✅ Accept
-                    </button>
-                    <button
-                      onClick={() => handleRejectJoinRequest(toast.requestId)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        background: 'rgba(239,68,68,0.2)',
-                        border: '1px solid rgba(239,68,68,0.4)',
-                        borderRadius: '8px',
-                        color: '#ef4444',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ❌ Reject
-                    </button>
-                  </div>
-                ) : (
-                  <p style={{ margin: 0, color: '#64748b', fontSize: '12px', textAlign: 'center' }}>
-                    Waiting for room creator to approve...
-                  </p>
-                )}
-                
-                {/* Progress bar for auto-dismiss */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: '3px',
-                  background: 'rgba(79,142,247,0.2)',
-                  borderRadius: '0 0 12px 12px',
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%',
-                    width: '100%',
-                    background: 'linear-gradient(90deg, #4f8ef7, #38e8c4)',
-                    animation: 'progress 4s linear forwards',
-                  }} />
+                    gap: '6px'
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>✔️</span> Attend
+                </button>
+                <button
+                  onClick={() => setCallInvite(null)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'rgba(239,68,68,0.15)',
+                    border: '1px solid rgba(239,68,68,0.3)',
+                    borderRadius: '10px',
+                    color: '#f87171',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Global Attendance Check Toast ── */}
+          {attendanceRequest && (
+            <div style={{
+              background: 'linear-gradient(135deg, #064e3b, #065f46)',
+              border: '2px solid #34d399',
+              borderRadius: '20px',
+              padding: '20px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+              animation: 'slideIn 0.4s ease-out'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
+                <div style={{ width: '45px', height: '45px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📋</div>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ margin: 0, color: '#34d399', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>Attendance Check</h4>
+                  <p style={{ margin: 0, color: '#fff', fontSize: '14px', fontWeight: '600' }}>Confirm your presence</p>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    emit('attendance_response', {
+                      roomCode: roomCode.toUpperCase(),
+                      userName: user.name,
+                      status: 'present'
+                    });
+                    setAttendanceRequest(null);
+                  }}
+                  style={{ flex: 1, padding: '12px', background: '#34d399', border: 'none', borderRadius: '12px', color: '#064e3b', fontWeight: '800', fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                >
+                  PRESENT
+                </button>
+                <button
+                  onClick={() => {
+                    emit('attendance_response', {
+                      roomCode: roomCode.toUpperCase(),
+                      userName: user.name,
+                      status: 'absent'
+                    });
+                    setAttendanceRequest(null);
+                  }}
+                  style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.1)', border: '1px solid #34d399', borderRadius: '12px', color: '#34d399', fontWeight: '700', fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                >
+                  ABSENT
+                </button>
+              </div>
+              <p style={{ margin: '12px 0 0', color: 'rgba(52,211,153,0.5)', fontSize: '10px', textAlign: 'center', fontWeight: '500' }}>Auto-set to "Not Responding" in 45s</p>
+            </div>
+          )}
+
+          {/* ── Global Live Quiz Toast ── */}
+          {activeQuiz && !activeQuiz.responses?.[user?.name] && (
+            <div style={{
+              background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+              border: '2px solid #a78bfa',
+              borderRadius: '20px',
+              padding: '20px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.7), 0 0 30px rgba(167,139,250,0.15)',
+              animation: 'slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+              position: 'relative'
+            }}>
+              <div style={{ position: 'absolute', top: '10px', right: '15px', color: '#a78bfa', fontSize: '20px' }}>📝</div>
+              <h4 style={{ margin: '0 0 10px', color: '#a78bfa', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '2px' }}>Live Class Quiz</h4>
+              <p style={{ margin: '0 0 16px', color: '#fff', fontSize: '15px', fontWeight: '600', lineHeight: 1.4 }}>{activeQuiz.question}</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+                {activeQuiz.options.map((opt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedQuizOption(idx)}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: selectedQuizOption === idx ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.1)',
+                      background: selectedQuizOption === idx ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.05)',
+                      color: '#fff',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s transform active:scale-95'
+                    }}
+                  >
+                    <span style={{ fontWeight: 'bold', marginRight: '8px', color: '#a78bfa' }}>{String.fromCharCode(65 + idx)}.</span> {opt}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                disabled={selectedQuizOption === null}
+                onClick={() => {
+                  if (selectedQuizOption === null) return;
+                  emit('submit_quiz_answer', {
+                    roomCode: roomCode.toUpperCase(),
+                    userName: user.name,
+                    optionIndex: selectedQuizOption
+                  });
+                  // Mark as responded locally to hide
+                  setActiveQuiz(prev => ({
+                    ...prev,
+                    responses: { ...(prev.responses || {}), [user.name]: selectedQuizOption }
+                  }));
+                  setSelectedQuizOption(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: selectedQuizOption === null ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+                  color: selectedQuizOption === null ? '#94a3b8' : '#fff',
+                  border: 'none',
+                  borderRadius: '14px',
+                  fontWeight: '800',
+                  fontSize: '13px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  cursor: selectedQuizOption === null ? 'default' : 'pointer',
+                  transition: 'all 0.3s'
+                }}
+              >
+                {selectedQuizOption === null ? 'Select an Answer' : 'Submit Answer'}
+              </button>
+            </div>
+          )}
+
+          {/* ── Creator Response Notifications ── */}
+          {isHost && creatorNotifications.map((toast) => (
+            <div
+              key={toast.id}
+              onClick={() => {
+                setCreatorNotifications(prev => prev.filter(n => n.id !== toast.id));
+              }}
+              style={{
+                background: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(12px)',
+                border: `1.5px solid ${toast.type === 'quiz' ? '#a78bfa' : '#34d399'}`,
+                borderRadius: '16px',
+                padding: '12px 16px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+                animation: 'slideIn 0.3s ease-out',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{
+                width: '36px', height: '36px', borderRadius: '10px',
+                background: toast.type === 'quiz' ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'linear-gradient(135deg, #10b981, #059669)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px'
+              }}>
+                {toast.type === 'quiz' ? '✅' : '👋'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, color: '#fff', fontSize: '13px', fontWeight: '700' }}>
+                  {toast.userName}
+                </p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '500' }}>
+                  {toast.type === 'quiz'
+                    ? `Answered: Option ${String.fromCharCode(65 + (toast.answer || 0))}`
+                    : `Marked: ${toast.status?.toUpperCase()}`}
+                </p>
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px' }}>×</div>
+              {/* Progress Bar for Auto-hide */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, height: '2px', background: toast.type === 'quiz' ? '#a78bfa' : '#34d399',
+                width: '100%', animation: 'progress 5s linear forwards'
+              }} />
+            </div>
+          ))}
+
+          {/* Join Request Toasts */}
+          {joinRequestToasts.map((toast) => (
+            <div
+              key={toast.requestId}
+              style={{
+                position: 'relative',
+                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                border: '1px solid rgba(79,142,247,0.3)',
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                animation: 'slideIn 0.3s ease-out',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #4f8ef7, #6a5af7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                }}>
+                  👤
+                </div>
+                <div>
+                  <p style={{ margin: 0, color: '#fff', fontWeight: '600', fontSize: '14px' }}>
+                    Join Request
+                  </p>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
+                    <strong style={{ color: '#4f8ef7' }}>{toast.userName}</strong> wants to join
+                  </p>
+                </div>
+              </div>
+
+              {toast.isHost ? (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleApproveJoinRequest(toast.requestId)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✅ Accept
+                  </button>
+                  <button
+                    onClick={() => handleRejectJoinRequest(toast.requestId)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: 'rgba(239,68,68,0.2)',
+                      border: '1px solid rgba(239,68,68,0.4)',
+                      borderRadius: '8px',
+                      color: '#ef4444',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ❌ Reject
+                  </button>
+                </div>
+              ) : (
+                <p style={{ margin: 0, color: '#64748b', fontSize: '12px', textAlign: 'center' }}>
+                  Waiting for room creator to approve...
+                </p>
+              )}
+
+              {/* Progress bar for auto-dismiss */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: 'rgba(79,142,247,0.2)',
+                borderRadius: '0 0 12px 12px',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: '100%',
+                  background: 'linear-gradient(90deg, #4f8ef7, #38e8c4)',
+                  animation: 'progress 4s linear forwards',
+                }} />
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* ── Top Bar ── */}
         <div className="cr-topbar-wrap">
@@ -850,120 +1161,44 @@ function ChatRoom() {
             onStartVideoCall={() => handleStartCall('video')}
             onStartVoiceCall={() => handleStartCall('voice')}
             onLeaveRoom={handleLeaveRoom}
+            onShowAIAssistant={() => setShowAIAssistant(true)}
           />
-          
+
           {/* AI Feature Buttons */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            padding: '8px 16px',
-            background: 'var(--surface)',
-            borderBottom: '1px solid var(--border)',
-            overflowX: 'auto',
-          }}>
-            <button
-              onClick={() => setShowAIAssistant(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #4f8ef7, #6a5af7)',
-                border: 'none',
-                borderRadius: '20px',
-                color: '#fff',
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              🤖 AI Assistant
-            </button>
-            <button
-              onClick={() => setShowFileOrganizer(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                border: 'none',
-                borderRadius: '20px',
-                color: '#fff',
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              📁 File Organizer
-            </button>
-            <button
-              onClick={() => setShowEducationMode(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                border: 'none',
-                borderRadius: '20px',
-                color: '#fff',
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              🎓 Education
-            </button>
-            <button
-              onClick={() => setShowSecureRoom(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                border: 'none',
-                borderRadius: '20px',
-                color: '#fff',
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              🔐 Secure Room
-            </button>
+          <div className="cr-feature-bar">
+            <button className="cr-feature-btn" onClick={() => setShowAIAssistant(true)} style={{ background: 'linear-gradient(135deg, #4f8ef7, #6a5af7)' }}>🤖 AI Assistant</button>
+            <button className="cr-feature-btn" onClick={() => setShowFileOrganizer(true)} style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>📁 Files</button>
+            <button className="cr-feature-btn" onClick={() => setShowEducationMode(true)} style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>🎓 Education</button>
+            <button className="cr-feature-btn" onClick={() => setShowSecureRoom(true)} style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>🔐 Secure</button>
           </div>
         </div>
 
         {/* ── Body ── */}
         <div className="cr-body">
 
-          {/* Sidebar */}
+          {/* Mobile sidebar overlay backdrop */}
           {showSidebar && (
-            <div className="cr-sidebar-wrap">
-              <Sidebar
-                participants={participants}
-                currentUser={user}
-                isHost={isHost}
-                roomCode={roomCode}
-                onApproveRequest={(request) => {
-                  // Emit socket event to notify user
-                  emit('approve_join_request', { 
-                    roomCode, 
-                    userId: request.userId,
-                    userName: request.userName 
-                  });
-                }}
-                onRejectRequest={(request) => {
-                  emit('reject_join_request', { 
-                    roomCode, 
-                    userId: request.userId 
-                  });
-                }}
-              />
-            </div>
+            <div
+              className="cr-sidebar-overlay"
+              onClick={() => setShowSidebar(false)}
+            />
           )}
+
+          {/* Sidebar — desktop: inline, mobile: drawer */}
+          <div className={`cr-sidebar-wrap${showSidebar ? ' open' : ''}`}>
+            <Sidebar
+              participants={participants}
+              currentUser={user}
+              isHost={isHost}
+              roomCode={roomCode}
+              onApproveRequest={(request) => {
+                emit('approve_join_request', { roomCode, userId: request.userId, userName: request.userName });
+              }}
+              onRejectRequest={(request) => {
+                emit('reject_join_request', { roomCode, userId: request.userId });
+              }}
+            />
+          </div>
 
           {/* Chat column */}
           <div className="cr-main">
@@ -975,6 +1210,10 @@ function ChatRoom() {
                 messagesEndRef={messagesEndRef}
                 watermarkText={watermarkText}
                 watermarkSize={watermarkSize}
+                smartReplies={smartReplies}
+                onSendSmartReply={(reply) => handleSendMessage(reply)}
+                translatedMessages={translatedMessages}
+                onTranslate={(text, lang) => emit('translate_message', { text, targetLang: lang })}
               />
             </div>
 
@@ -982,6 +1221,12 @@ function ChatRoom() {
               <MessageInput
                 onSendMessage={handleSendMessage}
                 onTyping={handleTyping}
+                isImproving={isImproving}
+                onImprove={(text) => {
+                  setIsImproving(true);
+                  emit('improve_message', { text });
+                }}
+                improvedText={improvedText}
               />
             </div>
           </div>
@@ -999,10 +1244,10 @@ function ChatRoom() {
         )}
 
       </div>
-      
+
       {/* Refresh Button - only show when not in call */}
       {!showCallPanel && (
-        <DraggableRefreshButton 
+        <DraggableRefreshButton
           onRefresh={async () => {
             // Refresh messages - merge with existing to avoid deletion
             try {
@@ -1026,15 +1271,48 @@ function ChatRoom() {
           cooldown={2500}
         />
       )}
-      
+
       {/* AI Work Assistant Modal */}
       <AIWorkAssistant
-        messages={messages}
-        roomName={room?.name || roomCode}
-        isVisible={showAIAssistant}
+        isOpen={showAIAssistant}
         onClose={() => setShowAIAssistant(false)}
+        messages={messages}
+        onSummarize={() => {
+          setIsSummarizing(true);
+          emit('summarize_chat', { messages: messages.slice(-20) }); // Summarize last 20 messages
+        }}
+        onAssistantQuery={(query) => {
+          emit('ai_assistant_query', {
+            roomCode: roomCode.toUpperCase(),
+            query,
+            chatHistory: messages.slice(-5),
+            roomId: room._id || roomCode
+          });
+        }}
+        chatSummary={chatSummary}
+        isSummarizing={isSummarizing}
+        onVoiceToText={(lang = 'en-US') => {
+          // Check for Speech Recognition support
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = lang;
+            recognition.start();
+            recognition.onresult = (event) => {
+              const transcript = event.results[0][0].transcript;
+              handleSendMessage(`🎙️ [Voice-AI]: ${transcript}`);
+              setShowAIAssistant(false);
+            };
+          } else {
+            alert('Speech recognition is not supported in this browser.');
+          }
+        }}
+        onImageGenerate={(prompt) => {
+          handleSendMessage(`/image ${prompt}`);
+          setShowAIAssistant(false);
+        }}
       />
-      
+
       {/* Smart File Organizer Modal */}
       <SmartFileOrganizer
         files={sharedFiles}
@@ -1045,7 +1323,7 @@ function ChatRoom() {
         isVisible={showFileOrganizer}
         onClose={() => setShowFileOrganizer(false)}
       />
-      
+
       {/* Education Mode Modal */}
       <EducationMode
         isActive={showEducationMode}
@@ -1053,8 +1331,14 @@ function ChatRoom() {
         messages={messages}
         participants={participants}
         currentUser={user}
+        isHost={isHost}
+        roomCode={roomCode}
+        externalAttendance={attendanceList}
+        setExternalAttendance={setAttendanceList}
+        externalActiveQuiz={activeQuiz}
+        setExternalActiveQuiz={setActiveQuiz}
       />
-      
+
       {/* Secure Room Modal */}
       <SecureRoom
         isVisible={showSecureRoom}
@@ -1062,10 +1346,10 @@ function ChatRoom() {
         roomCode={roomCode}
         isHost={isHost}
         currentUser={user}
-        // Callbacks are now handled by sharedState subscriptions in useEffect
-        // No need to pass onSettingChange or onScreenshotDetected
+      // Callbacks are now handled by sharedState subscriptions in useEffect
+      // No need to pass onSettingChange or onScreenshotDetected
       />
-      
+
       {/* Auto-delete Toast Notification */}
       {showAutoDeleteToast && (
         <div className="fixed top-4 right-4 z-50">

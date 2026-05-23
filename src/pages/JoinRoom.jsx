@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useRoom } from '../context/RoomContext';
+import { useSocket } from '../context/SocketContext';
 import { isValidRoomCode } from '../utils/generateRoomCode';
 import { getRoom, sendJoinRequest } from '../services/api';
 import { Scanner } from '@yudiel/react-qr-scanner';
@@ -185,6 +186,7 @@ function JoinRoom() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const { setRoomData, setUserData } = useRoom();
+  const { socket } = useSocket();
 
   const [roomCode, setRoomCode] = useState(searchParams.get('code') || location.state?.prefillCode || '');
   const [userName, setUserName] = useState('');
@@ -215,15 +217,15 @@ function JoinRoom() {
       const response = await getRoom(roomCode);
       if (response.success) {
         const user = {
-          id: `user-${Date.now()}`,
+          id: socket?.id || `user-${Date.now()}`,
           name: userName,
         };
 
+        console.log('🔗 Sending join request with Requester ID:', user.id);
         const joinRes = await sendJoinRequest(roomCode.toUpperCase(), user);
 
         if (joinRes.ok) {
           setRequestSent(true);
-          // Store basic info for Waiting page
           setRoomData(response.room);
           setUserData({ name: userName, isHost: false });
 
@@ -502,7 +504,6 @@ function JoinRoom() {
           setUserName('');
           setError('');
           setShowScanner(false);
-          setScanError('');
         }}
       />
     </>

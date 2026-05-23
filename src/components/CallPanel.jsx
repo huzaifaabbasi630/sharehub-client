@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
+import { useSocket } from '../context/SocketContext';
 import { useRoom } from '../context/RoomContext';
 import {
   getLocalStream,
@@ -214,13 +214,11 @@ const S = () => (
 );
 
 function CallPanel({ roomCode, callType, onClose }) {
-  // const { emit, on, off } = useSocket(); // WebSocket disabled
-    const emit = () => {};
-    const on = () => {};
-    const off = () => {};
+  const { socket, emit, on, off } = useSocket();
   const { user } = useRoom();
 
   const [localStream, setLocalStream] = useState(null);
+  const localStreamRef = useRef(null);
   const [remoteStreams, setRemoteStreams] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -229,61 +227,83 @@ function CallPanel({ roomCode, callType, onClose }) {
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef(new Map());
 
+  const addTracksToPc = (pc, stream) => {
+    if (!stream) return;
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
+  };
+
+  const initiatePeerConnection = async (peerId) => {
+    const pc = createPeerConnection(
+      peerId,
+      (id, stream) => handleRemoteStream(id, stream),
+      (id, candidate) => emit('webrtc_ice_candidate', { targetId: peerId, candidate, senderId: socket.id })
+    );
+
+    if (localStreamRef.current) {
+      addTracksToPc(pc, localStreamRef.current);
+    }
+
+    const offer = await createOffer(peerId);
+    emit('webrtc_offer', { targetId: peerId, offer, senderId: socket.id });
+  };
+
   useEffect(() => {
     const initCall = async () => {
       try {
-        const stream = await getLocalStream(callType === 'video', callType !== 'voice');
+        // Ensure audio is always true for calls
+        const stream = await getLocalStream(callType === 'video', true);
         setLocalStream(stream);
+        localStreamRef.current = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        emit('join_call', { roomCode, userId: user.socketId || 'unknown', userName: user.name });
+        emit('join_call', { roomCode: roomCode.toUpperCase(), userId: socket.id, userName: user.name });
       } catch (error) {
         console.error('Error initializing call:', error);
       }
     };
-    initCall();
 
-    on('user_joined_call', (data) => {
-      console.log('User joined call:', data);
-      initiatePeerConnection(data.userId);
-    });
+    if (socket) {
+      initCall();
 
-    on('webrtc_offer', async (data) => {
-      const { offer, senderId } = data;
-      const pc = createPeerConnection(
-        senderId,
-        (peerId, stream) => handleRemoteStream(peerId, stream),
-        (peerId, candidate) => emit('webrtc_ice_candidate', { targetId: peerId, candidate, senderId: user.socketId })
-      );
-      if (localStream) localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-      const answer = await createAnswer(senderId, offer);
-      emit('webrtc_answer', { targetId: senderId, answer, senderId: user.socketId });
-    });
+      on('user_joined_call', (data) => {
+        console.log('User joined call signaling:', data);
+        initiatePeerConnection(data.userId);
+      });
 
-    on('webrtc_answer', (data) => handleAnswer(data.senderId, data.answer));
-    on('webrtc_ice_candidate', (data) => handleIceCandidate(data.senderId, data.candidate));
-    on('user_left_call', (data) => setRemoteStreams(prev => prev.filter(s => s.userId !== data.userId)));
+      on('webrtc_offer', async (data) => {
+        const { offer, senderId } = data;
+        const pc = createPeerConnection(
+          senderId,
+          (peerId, stream) => handleRemoteStream(peerId, stream),
+          (peerId, candidate) => emit('webrtc_ice_candidate', { targetId: peerId, candidate, senderId: socket.id })
+        );
+
+        if (localStreamRef.current) {
+          addTracksToPc(pc, localStreamRef.current);
+        }
+
+        const answer = await createAnswer(senderId, offer);
+        emit('webrtc_answer', { targetId: senderId, answer, senderId: socket.id });
+      });
+
+      on('webrtc_answer', (data) => handleAnswer(data.senderId, data.answer));
+      on('webrtc_ice_candidate', (data) => handleIceCandidate(data.senderId, data.candidate));
+      on('user_left_call', (data) => setRemoteStreams(prev => prev.filter(s => s.userId !== data.userId)));
+    }
 
     return () => {
       closeAllPeerConnections();
-      if (localStream) localStream.getTracks().forEach(track => track.stop());
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
       off('user_joined_call');
       off('webrtc_offer');
       off('webrtc_answer');
       off('webrtc_ice_candidate');
       off('user_left_call');
     };
-  }, [roomCode, callType, user, emit, on, off]);
-
-  const initiatePeerConnection = async (peerId) => {
-    const pc = createPeerConnection(
-      peerId,
-      (id, stream) => handleRemoteStream(id, stream),
-      (id, candidate) => emit('webrtc_ice_candidate', { targetId: peerId, candidate, senderId: user.socketId })
-    );
-    if (localStream) localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    const offer = await createOffer(peerId);
-    emit('webrtc_offer', { targetId: peerId, offer, senderId: user.socketId });
-  };
+  }, [roomCode, callType, socket, emit, on, off]);
 
   const handleRemoteStream = (peerId, stream) => {
     setRemoteStreams(prev => {
@@ -294,20 +314,22 @@ function CallPanel({ roomCode, callType, onClose }) {
   };
 
   const handleToggleMute = () => {
-    toggleAudio(!isMuted);
-    setIsMuted(!isMuted);
-    emit('mute_audio', { roomCode, userId: user.socketId, muted: !isMuted });
+    const nextMuted = !isMuted;
+    toggleAudio(!nextMuted); // If we're muting (true), set enabled to false
+    setIsMuted(nextMuted);
+    emit('mute_audio', { roomCode: roomCode.toUpperCase(), userId: socket.id, muted: nextMuted });
   };
 
   const handleToggleVideo = () => {
-    toggleVideo(!isVideoOff);
-    setIsVideoOff(!isVideoOff);
-    emit('disable_video', { roomCode, userId: user.socketId, disabled: !isVideoOff });
+    const nextDisabled = !isVideoOff;
+    toggleVideo(!nextDisabled); // If we're disabling video (true), set enabled to false
+    setIsVideoOff(nextDisabled);
+    emit('disable_video', { roomCode: roomCode.toUpperCase(), userId: socket.id, disabled: nextDisabled });
   };
 
   const handleEndCall = () => {
-    emit('leave_call', { roomCode, userId: user.socketId });
-    emit('end_call', { roomCode, userId: user.socketId });
+    emit('leave_call', { roomCode: roomCode.toUpperCase(), userId: socket.id });
+    emit('end_call', { roomCode: roomCode.toUpperCase(), userId: socket.id });
     closeAllPeerConnections();
     if (localStream) localStream.getTracks().forEach(track => track.stop());
     onClose();
@@ -340,18 +362,18 @@ function CallPanel({ roomCode, callType, onClose }) {
             )}
 
             <div className="cp-name-tag">
-              <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:'#38e8c4', flexShrink:0 }} />
+              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#38e8c4', flexShrink: 0 }} />
               <span>You{isMuted ? ' · Muted' : ''}</span>
             </div>
 
             {isMuted && (
               <div className="cp-muted-badge">
                 <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                  <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/>
-                  <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                  <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6" />
+                  <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
                 </svg>
                 <span>Muted</span>
               </div>
@@ -372,7 +394,7 @@ function CallPanel({ roomCode, callType, onClose }) {
                 playsInline
               />
               <div className="cp-name-tag">
-                <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:'#4f8ef7', flexShrink:0 }} />
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4f8ef7', flexShrink: 0 }} />
                 <span>Participant {index + 1}</span>
               </div>
             </div>
@@ -383,20 +405,20 @@ function CallPanel({ roomCode, callType, onClose }) {
         <div className="cp-controls">
 
           {/* Mute */}
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'22px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '22px' }}>
             <button className={`cp-ctrl-btn${isMuted ? ' active' : ''}`} onClick={handleToggleMute} title={isMuted ? 'Unmute' : 'Mute'}>
               {isMuted ? (
                 <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                  <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/>
-                  <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                  <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6" />
+                  <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23" />
+                  <line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
                 </svg>
               ) : (
                 <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                  <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                  <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
                 </svg>
               )}
               <span className="cp-label">{isMuted ? 'Unmute' : 'Mute'}</span>
@@ -405,18 +427,18 @@ function CallPanel({ roomCode, callType, onClose }) {
 
           {/* Video toggle */}
           {callType === 'video' && (
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'22px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '22px' }}>
               <button className={`cp-ctrl-btn${isVideoOff ? ' active' : ''}`} onClick={handleToggleVideo} title={isVideoOff ? 'Start Video' : 'Stop Video'}>
                 {isVideoOff ? (
                   <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.66 0H14a2 2 0 012 2v3.34"/>
-                    <path d="M23 7l-7 5 7 5V7z"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
+                    <path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.66 0H14a2 2 0 012 2v3.34" />
+                    <path d="M23 7l-7 5 7 5V7z" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
                   </svg>
                 ) : (
                   <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 7l-7 5 7 5V7z"/>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    <path d="M23 7l-7 5 7 5V7z" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                   </svg>
                 )}
                 <span className="cp-label">{isVideoOff ? 'Start Video' : 'Stop Video'}</span>
@@ -425,16 +447,16 @@ function CallPanel({ roomCode, callType, onClose }) {
           )}
 
           {/* Spacer */}
-          <div style={{ width:'16px' }} />
+          <div style={{ width: '16px' }} />
 
           {/* End call */}
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'22px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '22px' }}>
             <button className="cp-end-btn" onClick={handleEndCall} title="End Call">
               <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.88 19.79 19.79 0 01.36 1.25 2 2 0 012.34 3h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.32 10.9a16 16 0 004.36 2.41z"/>
-                <line x1="23" y1="1" x2="1" y2="23"/>
+                <path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.88 19.79 19.79 0 01.36 1.25 2 2 0 012.34 3h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.32 10.9a16 16 0 004.36 2.41z" />
+                <line x1="23" y1="1" x2="1" y2="23" />
               </svg>
-              <span className="cp-label" style={{ color:'rgba(239,68,68,0.6)' }}>End</span>
+              <span className="cp-label" style={{ color: 'rgba(239,68,68,0.6)' }}>End</span>
             </button>
           </div>
 

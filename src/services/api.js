@@ -40,8 +40,14 @@ export const sendJoinRequest = async (roomCode, user) => {
   return response.data;
 };
 
-export const acceptJoinRequest = async (roomCode, meetingPath, acceptedBy) => {
-  const response = await axios.post(`${API_BASE_URL}/api/accept-request`, { roomCode, meetingPath, acceptedBy });
+export const acceptJoinRequest = async (roomCode, meetingPath, acceptedBy, requesterId, requesterName) => {
+  const response = await axios.post(`${API_BASE_URL}/api/accept-request`, { 
+    roomCode, 
+    meetingPath, 
+    acceptedBy,
+    requesterId,      // ✅ Send requester info so server can notify specific user
+    requesterName
+  });
   return response.data;
 };
 

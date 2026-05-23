@@ -12,11 +12,11 @@ const VoiceMessagePlayer = ({ audioUrl }) => {
     try {
       audio = new Audio(audioUrl);
       audioRef.current = audio;
-      
+
       audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
       audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
       audio.addEventListener('ended', () => setIsPlaying(false));
-      
+
       // Handle playback errors
       audio.addEventListener('error', (e) => {
         console.error('Audio playback error:', e);
@@ -24,7 +24,7 @@ const VoiceMessagePlayer = ({ audioUrl }) => {
     } catch (error) {
       console.error('Error creating audio element:', error);
     }
-    
+
     return () => {
       if (audio) {
         audio.pause();
@@ -63,21 +63,21 @@ const VoiceMessagePlayer = ({ audioUrl }) => {
       <button className="cb-voice-play" onClick={togglePlay}>
         {isPlaying ? (
           <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#ef4444' }}>
-            <rect x="6" y="4" width="4" height="16" rx="1"/>
-            <rect x="14" y="4" width="4" height="16" rx="1"/>
+            <rect x="6" y="4" width="4" height="16" rx="1" />
+            <rect x="14" y="4" width="4" height="16" rx="1" />
           </svg>
         ) : (
           <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#ef4444' }}>
-            <path d="M8 5v14l11-7z"/>
+            <path d="M8 5v14l11-7z" />
           </svg>
         )}
       </button>
       <div className="cb-voice-wave">
         {waveBars.map((bar, i) => (
-          <div 
-            key={i} 
-            className="cb-voice-bar" 
-            style={{ 
+          <div
+            key={i}
+            className="cb-voice-bar"
+            style={{
               height: `${bar.height}px`,
               background: bar.isActive ? '#ef4444' : 'rgba(239,68,68,0.3)'
             }}
@@ -375,7 +375,18 @@ const S = () => (
   `}</style>
 );
 
-function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermarkText, watermarkSize = '9xl' }) {
+function ChatBox({
+  messages,
+  currentUser,
+  typingUsers,
+  messagesEndRef,
+  watermarkText,
+  watermarkSize = '9xl',
+  smartReplies = {},
+  onSendSmartReply,
+  translatedMessages = {},
+  onTranslate
+}) {
   console.log('ChatBox received watermarkText:', watermarkText, 'watermarkSize:', watermarkSize);
 
   const formatTime = (timestamp) => {
@@ -417,14 +428,14 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
             <div className="cb-empty">
               <div className="cb-empty-icon">
                 <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                 </svg>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontFamily:"'Syne',sans-serif", fontSize:'16px', fontWeight:'700', color:'rgba(238,242,255,0.5)', marginBottom:'6px' }}>
+                <p style={{ fontFamily: "'Syne',sans-serif", fontSize: '16px', fontWeight: '700', color: 'rgba(238,242,255,0.5)', marginBottom: '6px' }}>
                   No messages yet
                 </p>
-                <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'13.5px', color:'rgba(148,163,184,0.35)' }}>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '13.5px', color: 'rgba(148,163,184,0.35)' }}>
                   Be the first to say something 👋
                 </p>
               </div>
@@ -437,9 +448,12 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
             const showDate = messageDate !== lastDate;
             lastDate = messageDate;
             const isOwn = message.senderName === currentUser.name;
+            const isLastMessage = index === messages.length - 1;
+            const currentSmartReplies = smartReplies[message._id] || [];
+            const translatedText = translatedMessages[message.content];
 
             return (
-              <div key={message._id || index}>
+              <div key={message._id || index} className="mb-4">
 
                 {/* Date divider */}
                 {showDate && (
@@ -454,14 +468,14 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
                   {!isOwn && (
                     <div style={{
                       width: '30px', height: '30px', borderRadius: '50%',
-                      background: 'linear-gradient(135deg,#4f8ef7,#6a5af7)',
+                      background: message.senderId === 'ai-assistant' ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'linear-gradient(135deg,#4f8ef7,#6a5af7)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontFamily: "'Syne',sans-serif", color: '#fff',
                       fontSize: '12px', fontWeight: '800',
                       flexShrink: 0, marginRight: '8px', marginTop: '2px',
                       alignSelf: 'flex-end',
                     }}>
-                      {message.senderName?.charAt(0).toUpperCase()}
+                      {message.senderId === 'ai-assistant' ? '🤖' : message.senderName?.charAt(0).toUpperCase()}
                     </div>
                   )}
 
@@ -469,22 +483,32 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
 
                     {/* Sender name (others only) */}
                     {!isOwn && (
-                      <p className="cb-sender">{message.senderName}</p>
+                      <p className="cb-sender" style={{ color: message.senderId === 'ai-assistant' ? '#a78bfa' : '#4f8ef7' }}>
+                        {message.senderName}
+                        {message.senderId === 'ai-assistant' && <span className="ml-2 text-[9px] bg-purple-500/20 px-1.5 py-0.5 rounded text-purple-300 font-black uppercase tracking-widest">AI</span>}
+                      </p>
+                    )}
+
+                    {/* Image message */}
+                    {message.type === 'image' && (
+                      <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
+                        <img src={message.fileUrl} alt="Generated" className="w-full h-auto object-cover max-h-64" />
+                      </div>
                     )}
 
                     {/* Voice message */}
                     {message.type === 'voice' ? (
                       <VoiceMessagePlayer audioUrl={message.fileUrl || message.content} />
                     ) : (
-                      <>
+                      <div className="relative group/msg">
                         {/* File attachment */}
                         {(message.type === 'file' || message.fileUrl) ? (
                           <div>
                             <div className="cb-file">
                               <div className="cb-file-icon">
                                 <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                                  <polyline points="14 2 14 8 20 8"/>
+                                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
                                 </svg>
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -497,9 +521,28 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
                             {message.content && message.content.startsWith('http') === false && <p className="cb-text">{message.content}</p>}
                           </div>
                         ) : (
-                          <p className="cb-text">{message.content}</p>
+                          <>
+                            <p className="cb-text">{message.content}</p>
+                            {translatedText && (
+                              <div className="mt-2 pt-2 border-t border-white/5 animate-fade-in">
+                                <p className="text-[10px] font-bold text-azure opacity-40 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                  <span>🌐</span> Translated
+                                </p>
+                                <p className="text-sm italic text-indigo-300/80">{translatedText}</p>
+                              </div>
+                            )}
+                          </>
                         )}
-                      </>
+
+                        {/* Translation Buttons */}
+                        {!isOwn && message.type === 'text' && (
+                          <div className="absolute -right-32 top-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex gap-1 p-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 z-20">
+                            <button onClick={() => onTranslate(message.content, 'Urdu')} className="text-[9px] font-bold px-1.5 py-1 hover:text-indigo-400 transition-colors" title="Translate to Urdu">اردو</button>
+                            <button onClick={() => onTranslate(message.content, 'Hindi')} className="text-[9px] font-bold px-1.5 py-1 hover:text-pink-400 transition-colors" title="Translate to Hindi">हिन्दी</button>
+                            <button onClick={() => onTranslate(message.content, 'English')} className="text-[9px] font-bold px-1.5 py-1 hover:text-azure transition-colors" title="Translate to English">EN</button>
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Time + read tick */}
@@ -507,12 +550,27 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
                       <span className="cb-time">{formatTime(message.createdAt)}</span>
                       {isOwn && (
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12"/>
+                          <polyline points="20 6 9 17 4 12" />
                         </svg>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {/* AI Smart Replies below the message */}
+                {!isOwn && currentSmartReplies.length > 0 && isLastMessage && (
+                  <div className="flex flex-wrap gap-2 mt-3 ml-12 animate-fade-up">
+                    {currentSmartReplies.map((reply, ridx) => (
+                      <button
+                        key={ridx}
+                        onClick={() => onSendSmartReply(reply)}
+                        className="bg-indigo-600/10 border border-indigo-500/20 text-indigo-300 text-xs px-3 py-1.5 rounded-full hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                      >
+                        {reply}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -528,7 +586,7 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
                 flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end',
               }}>
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#4f8ef7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                 </svg>
               </div>
               <div className="cb-typing-bubble">
@@ -547,10 +605,10 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
           <div ref={messagesEndRef} />
         </div>
       </div>
-      
+
       {/* Watermark Overlay */}
       {watermarkText && (
-        <div 
+        <div
           className="fixed inset-0 pointer-events-none z-10"
           style={{
             backgroundImage: `repeating-linear-gradient(
@@ -563,7 +621,7 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
           }}
         >
           <div className="absolute inset-0 flex items-center justify-center">
-            <div 
+            <div
               className={`text-${watermarkSize} font-bold text-red-500 opacity-10 select-none whitespace-nowrap`}
               style={{
                 transform: 'rotate(-30deg)',
@@ -577,6 +635,6 @@ function ChatBox({ messages, currentUser, typingUsers, messagesEndRef, watermark
       )}
     </>
   );
-};
+}
 
 export default ChatBox;

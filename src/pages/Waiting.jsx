@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-// import { useSocket } from '../context/SocketContext'; // WebSocket disabled
+import { useSocket } from '../context/SocketContext';
 import { useRoom } from '../context/RoomContext';
 import DraggableRefreshButton from '../components/DraggableRefreshButton';
 
@@ -126,54 +126,64 @@ const S = () => (
   `}</style>
 );
 
-import { usePusher } from '../context/PusherContext';
-
 function Waiting() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { bind, unbind, subscribe } = usePusher();
   const { setRoomData, setUserData } = useRoom();
+  const { on, off, socket } = useSocket();
 
   const { roomCode, userName, requestId } = location.state || {};
 
   useEffect(() => {
     if (!roomCode || !userName) {
+      console.log('❌ Missing roomCode or userName, redirecting to join');
       navigate('/join');
       return;
     }
 
-    // Subscribe to room channel
-    subscribe(`room-${roomCode}`);
+    console.log('🔄 Waiting page initialized with Socket.io:', { roomCode, userName, socketId: socket?.id });
 
     const handleAccept = (data) => {
-      console.log('Join approved received via Pusher:', data);
+      console.log('✅✅✅ JOIN APPROVED via Socket.io! Data:', data);
+
       setRoomData({
-        _id: data.roomCode, // Fallback if no specific ID
-        code: data.roomCode,
-        name: data.roomCode, // Or get from actual room data
+        _id: data.roomCode || roomCode,
+        code: data.roomCode || roomCode,
+        name: data.roomCode || roomCode,
       });
       setUserData({ name: userName, isHost: false });
 
-      // Store in localStorage for persistence
-      localStorage.setItem('sharehub_current_room', JSON.stringify({ code: data.roomCode }));
+      // Store in localStorage
+      localStorage.setItem('sharehub_current_room', JSON.stringify({ code: data.roomCode || roomCode }));
       localStorage.setItem('sharehub_current_user', JSON.stringify({ name: userName, isHost: false }));
 
-      navigate(`/room/${data.roomCode}`);
+      console.log('🎉🎉🎉 NAVIGATING TO ROOM:', `/room/${data.roomCode || roomCode}`);
+
+      // Redirect to room
+      setTimeout(() => {
+        navigate(`/room/${data.roomCode || roomCode}`);
+      }, 500);
     };
 
     const handleReject = (data) => {
-      alert(data.message || 'Join request rejected');
+      console.log('❌ Join request rejected via Socket.io:', data);
+      alert(data.message || 'Join request rejected by room creator');
       navigate('/join');
     };
 
-    bind('request-accepted', handleAccept);
-    bind('request-rejected', handleReject);
+    // Listen for events
+    on('join_approved', handleAccept);
+    on('request-accepted', handleAccept);
+    on('request_rejected', handleReject);
 
+    // ✅ Cleanup on unmount
     return () => {
-      unbind('request-accepted');
-      unbind('request-rejected');
+      console.log('🧹 Cleaning up Waiting page listeners...');
+      off('join_approved', handleAccept);
+      off('request-accepted', handleAccept);
+      off('request_rejected', handleReject);
     };
-  }, [roomCode, userName, bind, unbind, subscribe, navigate, setRoomData, setUserData]);
+  }, [roomCode, userName, navigate, setRoomData, setUserData, on, off, socket?.id]);
 
   return (
     <>
