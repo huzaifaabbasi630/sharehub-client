@@ -7,6 +7,7 @@ node_modules
 dist/
 build/
 .out/
+.env
 # Dependencies
 node_modules/
 npm-debug.log*
