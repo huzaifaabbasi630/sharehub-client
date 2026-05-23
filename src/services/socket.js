@@ -7,8 +7,22 @@ let socket = null;
 export const connectSocket = () => {
   if (!socket) {
     socket = io(SOCKET_URL, {
-      transports: ['polling', 'websocket'], // Use polling as fallback for Vercel
+      transports: ['websocket'], // Force WebSocket only
+      upgrade: false, // Disable upgrade from polling
       autoConnect: true
+    });
+
+    // Connection event listeners
+    socket.on('connect', () => {
+      console.log('✅ Socket connected:', socket.id);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('⚠️ Socket connection error:', error);
     });
   }
   return socket;
