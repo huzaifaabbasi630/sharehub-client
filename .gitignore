@@ -32,7 +32,6 @@ coverage/
 tmp/
 temp/
 # Environment variables
-.env
 .env.test
 .env.prod
 # IDE specific files
