@@ -7,7 +7,7 @@ let socket = null;
 export const connectSocket = () => {
   if (!socket) {
     socket = io(SOCKET_URL, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'], // Use polling as fallback for Vercel
       autoConnect: true
     });
   }
