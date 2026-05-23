@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://sharehub-backend.vercel.app';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://sharehubbackend-42pwxkva.b4a.run';
 
 let socket = null;
 

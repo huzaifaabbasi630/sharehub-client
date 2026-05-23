@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://sharehub-backend.vercel.app',
+        target: 'https://sharehubbackend-42pwxkva.b4a.run',
         changeOrigin: true
       }
     }

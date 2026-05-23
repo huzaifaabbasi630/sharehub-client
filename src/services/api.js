@@ -7,7 +7,7 @@ import axios from 'axios';
  * NOTE: Do NOT include "/api" in VITE_BACKEND_URL.
  */
 const API_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL || 'https://sharehub-backend.vercel.app';
+  import.meta.env.VITE_BACKEND_URL || 'https://sharehubbackend-42pwxkva.b4a.run';
 
 export const createRoom = async (roomData) => {
   const response = await axios.post(`${API_BASE_URL}/api/rooms/create`, roomData);
