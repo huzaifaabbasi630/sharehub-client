@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://sharehubbackend-42pwxkva.b4a.run',
+        target: 'https://sharehubbackend-jgf8qxf0.b4a.run',
         changeOrigin: true
       }
     }
